@@ -10,7 +10,15 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const screens = [
+    { name: "index", title: "Home", icon: "house.fill" },
+    { name: "explore", title: "Explore", icon: "paperplane.fill" },
+    { name: "profile", title: "Profile", icon: "person.fill" },
+    { name: "CalendarScreen", title: "CalendarScreen", icon: "person.fill" },
+    { name: "login", title: "Login", icon: "person.fill" },
+  ];
 
+  console.log("All tabs:", screens.map(screen => screen.name));
   return (
     <Tabs
       screenOptions={{
@@ -35,19 +43,34 @@ export default function TabLayout() {
       />  
       
       <Tabs.Screen
-        name="explore"
+        name="viewdiary"
         options={{
-          title: 'Explore',
+          title: 'viewdiary',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
         }}
       />
       <Tabs.Screen
-      name="profile"
+      name="postdiary"
       options={{
-        title: 'Profile',
+        title: 'postdiary',
         tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
       }}
     />
+    <Tabs.Screen
+      name="CalendarScreen"
+      options={{
+        title: 'CalendarScreen',
+        tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+      }}
+    />
+    <Tabs.Screen
+      name="login"
+      options={{
+        title: 'login',
+        tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+      }}
+    />
+  
        
     </Tabs>
   );
