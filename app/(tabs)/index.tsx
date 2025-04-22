@@ -1,6 +1,6 @@
 import { Image, StyleSheet, View, Text, FlatList, TouchableOpacity,ImageBackground } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
-
+import { useNavigation } from "@react-navigation/native";
 
 const events = [
   { id: '1', icon: '💕', title: 'Anniversary', days: 'D-10' },
@@ -11,7 +11,9 @@ const data = [
   { id: "2", title: "Travel", image: require("@/assets/images/tra.png") },
   { id: "3", title: "Daily", image: require("@/assets/images/phai.png") },
 ];
+
 export default function HomeScreen() {
+  const navigation = useNavigation();
   return (
     <View style={styles.container}>
       {/* Hình ảnh nền */}
@@ -97,6 +99,7 @@ export default function HomeScreen() {
             fontFamily: "IBM Plex Mono"
           }}>Ashley</Text>
         </View>
+        
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 20, marginTop: 20 }}>
 
@@ -128,7 +131,11 @@ export default function HomeScreen() {
             <Text style={{ fontSize: 12, fontWeight: 'light', color: '#FFE6E0', position: 'absolute' }}>125</Text>
           </View>
           <View style={{ width: '100%', alignItems: 'flex-end', position: 'absolute', bottom: 10, right: 10 }}>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+      // Xử lý khi người dùng nhấn vào nút
+      console.log("Button Pressed");
+      navigation.navigate("CalendarScreen",{isview:true});
+    }}>
               <Text style={{ color: '#FFF', fontSize: 12, marginTop: 15 }}>View calendar ►</Text>
             </TouchableOpacity>
           </View>
@@ -163,9 +170,9 @@ export default function HomeScreen() {
           </View>
 
           <View style={{ width: '100%', alignItems: 'flex-end', position: 'absolute', bottom: 10, right: 10 }}>
-            <TouchableOpacity>
-              <Text style={{ color: '#FFF', fontSize: 12, marginTop: 15 }}>Write diary ►</Text>
-            </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("postdiary")}>
+  <Text style={{ color: '#FFF', fontSize: 12, marginTop: 15 }}>Write diary ►</Text>
+</TouchableOpacity>
           </View>
 
         </View>
