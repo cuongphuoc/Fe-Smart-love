@@ -1,5 +1,5 @@
 import { View, Text, Image, TouchableOpacity, TextInput, Alert } from 'react-native';
-import { useState, useCallback } from 'react';
+import { useState, useCallback ,useEffect } from 'react';
 import { FontAwesome } from "@expo/vector-icons";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
 import * as ImagePicker from 'expo-image-picker';
@@ -9,6 +9,7 @@ import axios from "axios";
 // Định nghĩa kiểu cho tham số route
 type RouteParams = {
   day?: string;
+  diary:any;
 };
 let temp=1;
 // Định nghĩa kiểu cho đối tượng navigation (nếu bạn có các screen cụ thể)
@@ -23,10 +24,13 @@ type SelectedImageInfo = {
   type: string | null;
 };
 
+
 export default function ProfileScreen() {
   const route = useRoute<{ params: RouteParams }>();
-  const rawDate = route.params?.day || new Date().toISOString();
-
+  const rawDate =route.params?.diary?.date||route.params?.day || new Date().toISOString();
+ const edit =route.params?.diary||null;
+ const [isEdit, setisEdit] = useState(false);
+ 
   const formatDate = useCallback((isoDate: string): string => {
     return new Date(isoDate).toLocaleDateString("en-GB", {
       weekday: "short",
@@ -38,12 +42,27 @@ export default function ProfileScreen() {
 
   const date = formatDate(rawDate);
   console.log(date);
-
+ 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedImageInfo, setSelectedImageInfo] = useState<SelectedImageInfo>({ uri: null, name: null, type: null });
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  useEffect(() => {
+    if (edit) {
+      // Set the image information if edit has an image link
+      if (edit.link_img) {
+        setSelectedImageInfo({
+          uri: edit.link_img,
+          name: 'image', // You can adjust this according to your requirement
+          type: 'image/jpeg' // Or use the correct image type
+        });
+      }
 
+      // Set the title and description if they are available in edit
+      setTitle(edit.title || ""); // Fallback to empty string if title is undefined
+      setDescription(edit.description || ""); // Fallback to empty string if description is undefined
+    }
+  }, [edit]);
   const handleImageSelection = useCallback(async (source: 'library' | 'camera') => {
     const permissionResult = source === 'library'
       ? await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -79,34 +98,28 @@ export default function ProfileScreen() {
     const formData = new FormData();
     formData.append("title", title);
     formData.append("description", description);
-   formData.append("uri",selectedImageInfo.uri??"");
-    formData.append("name",selectedImageInfo.name?? "upload.jpg");
-    formData.append("type",selectedImageInfo.type ?? "image/jpeg");
-    formData.append("date",rawDate);
-  //  console.log(selectedImageInfo.type==="image")
-    if (selectedImageInfo.type==="image") {
-formData.append("uri",selectedImageInfo.uri??"");
-formData.append("name",selectedImageInfo.name?? "upload.jpg");
-formData.append("type",selectedImageInfo.type ?? "image/jpeg");
-const temp=true;
-formData.append("kind","true");
-      console.log(selectedImageInfo.type);
-      /*const imageFile = {
-        uri: selectedImageInfo.uri,
-        name: selectedImageInfo.name ?? "upload.jpg",
-        type: selectedImageInfo.type ?? "image/jpeg",
-      };
-      formData.append("image", {
-        uri: selectedImageInfo.uri!,
-        name: selectedImageInfo.name || "photo.jpg",
-        type: selectedImageInfo.type || "image/jpeg"
-      } as any);
-      console.log("Sending image:", selectedImageInfo);
-console.log("URI:", selectedImageInfo.uri);*/
+    formData.append("uri", selectedImageInfo.uri ?? "");
+    formData.append("name", selectedImageInfo.name ?? "upload.jpg");
+    formData.append("type", selectedImageInfo.type ?? "image/jpeg");
+    formData.append("date", rawDate);
 
-
+    if (selectedImageInfo.type === "image") {
+      formData.append("uri", selectedImageInfo.uri ?? "");
+      formData.append("name", selectedImageInfo.name ?? "upload.jpg");
+      formData.append("type", selectedImageInfo.type ?? "image/jpeg");
+      const temp = true;
+      formData.append("kind", "true");
+      console.log("Image type:", selectedImageInfo.type);
     }
-  
+
+    // Ghi log dữ liệu gửi đi
+    console.log("Post Data:", {
+      title,
+      description,
+      selectedImageInfo,
+      rawDate
+    });
+
     try {
       // Debug rõ ràng hơn
       console.log("Uploading diary:", { title, description, hasImage: !!selectedImageInfo.uri });
@@ -116,19 +129,16 @@ console.log("URI:", selectedImageInfo.uri);*/
         formData,
         {
           headers: {
-            
             Accept: "application/json",
-          
-            
           },
         }
       );
   
       if (response.status === 200) {
         Alert.alert("Thành công", `Nhật ký "${title}" đã được đăng!`);
-console.log(response.data)
-temp++;
-navigation.navigate("viewdiary",{day:rawDate,temp:temp});
+        console.log(response.data);
+        temp++;
+        navigation.navigate("viewdiary", { day: rawDate, temp: temp });
         setTitle("");
         setDescription("");
         setSelectedImageInfo({ uri: null, name: null, type: null });
@@ -140,7 +150,87 @@ navigation.navigate("viewdiary",{day:rawDate,temp:temp});
       console.error("Lỗi khi gửi:", error);
       Alert.alert("Lỗi", `Không thể tải lên, vui lòng thử lại!\n${error?.message || ""}`);
     }
-  }, [title, description, selectedImageInfo,date]);
+  }, [title, description, selectedImageInfo, date]);
+  const handleEdit = useCallback(async () => {
+    if (!title || !description) {
+      Alert.alert("Lỗi", "Vui lòng nhập tiêu đề và mô tả!");
+      return;
+    }
+    console.log(123)
+  
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("description", description);
+    if(!edit){
+    formData.append("uri", selectedImageInfo.uri ?? "");
+    formData.append("name", selectedImageInfo.name ?? "upload.jpg");
+    
+    formData.append("type", selectedImageInfo.type ?? "image/jpeg");
+    }
+    formData.append("date", rawDate);
+  
+    // Additional check for image type
+    if (selectedImageInfo.type === "image") {
+      formData.append("uri", selectedImageInfo.uri ?? "");
+      formData.append("name", selectedImageInfo.name ?? "upload.jpg");
+      formData.append("type", selectedImageInfo.type ?? "image/jpeg");
+      formData.append("kind", "true");
+      formData.append("diaryId",edit.id_diary);
+      console.log("Image type:", selectedImageInfo.type);
+    }else{
+      formData.append("img_link", edit.link_img?? "");
+      formData.append("name", edit.name ?? "upload.jpg");
+      formData.append("type", edit.type ?? "image/jpeg");
+      formData.append("kind", "true");
+      formData.append("diaryId",edit.id_diary);
+      console.log("Image type:",edit.type);
+    }
+  
+    // Log the data to be posted
+    console.log("Edit Data:", {
+      title,
+      description,
+      selectedImageInfo,
+      rawDate,
+    });
+  
+    try {
+      // Ensure edit mode is active and we have an ID to update
+      if (edit && edit._id) {
+        console.log(edit.id_diary)
+        const response = await axios.put(
+          `http://localhost:3000/api/diaries`, // Assuming you have an `id` for editing
+          formData,
+          {
+            headers: {
+              Accept: "application/json",
+            },
+          }
+        );
+  
+        if (response.status === 200) {
+          console.log(234)
+          Alert.alert("Thành công", `Nhật ký "${title}" đã được cập nhật!`);
+          console.log(response.data);
+          temp++;
+          navigation.navigate("viewdiary", { day: rawDate, temp: temp});
+          setTitle("");
+          setDescription("");
+          setSelectedImageInfo({ uri: null, name: null, type: null });
+        } else {
+          console.log("Lỗi server:", response.data);
+          throw new Error(response.data?.message || "Cập nhật nhật ký thất bại.");
+        }
+      } else {
+        Alert.alert("Lỗi", "Không tìm thấy nhật ký cần sửa!");
+      }
+    } catch (error: any) {
+      console.error("Lỗi khi gửi:", error);
+      Alert.alert("Lỗi", `Không thể cập nhật, vui lòng thử lại!\n${error?.message || ""}`);
+    }
+  }, [title, description, selectedImageInfo, rawDate, edit]);
+  
+  
   const handleDescriptionChange = (text: string) => {
     const formatted = text.replace(/(.{100})/g, '$1\n'); // thêm \n sau mỗi 100 ký tự
     setDescription(formatted);
@@ -177,7 +267,6 @@ navigation.navigate("viewdiary",{day:rawDate,temp:temp});
         />
       </View>
 
-
       <View style={{ paddingHorizontal: 20 }}>
         <TextInput
           placeholder="Description"
@@ -200,11 +289,13 @@ navigation.navigate("viewdiary",{day:rawDate,temp:temp});
         </View>
 
         <TouchableOpacity
-          style={{ backgroundColor: "#EE1D52B0", paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, marginRight: 10 }}
-          onPress={handlePost}
-        >
-          <Text style={{ color: "white", fontWeight: "bold" }}>Post</Text>
-        </TouchableOpacity>
+  style={{ backgroundColor: "#EE1D52B0", paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, marginRight: 10 }}
+  onPress={edit ? handleEdit : handlePost} // Conditionally call handleEdit or handlePost
+>
+  <Text style={{ color: "white", fontWeight: "bold" }}>
+    {edit ? "Edit" : "Post"} {/* Conditionally change text */}
+  </Text>
+</TouchableOpacity>
       </View>
 
       {/* Hiển thị ảnh đã chọn */}

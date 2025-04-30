@@ -3,7 +3,7 @@ import { useFonts, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-d
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useState } from 'react';
 import { useRoute } from "@react-navigation/native";
-
+import { useNavigation } from '@react-navigation/native';  // Import useNavigation
 SplashScreen.preventAutoHideAsync();
 
 const formatDate = (dateString: any) => {
@@ -16,18 +16,22 @@ const formatDate = (dateString: any) => {
 
 export default function TabTwoScreen() {
   const [triggerXoa, setTriggerXoa] = useState(false);
-  type RouteParams = { day?: string ,temp?:Int16Array };
-  const route = useRoute<{ params: RouteParams }>();
   
+  
+  type RouteParams = { day?: string ,temp?:Int16Array ,isedit?:boolean};
+  const route = useRoute<{ params: RouteParams }>();
+  const navigation = useNavigation(); // Khởi tạo useNavigation
   const rawDate = route.params?.day || new Date().toISOString();
   const temp= route.params?.temp || 0;
-
+  
 console.log(temp);
   const [fontsLoaded] = useFonts({ PlayfairBold: PlayfairDisplay_700Bold });
   const [diaryData, setDiaryData] = useState([]);
 
   useEffect(() => {
+    
     const fetchData = async () => {
+      
       try {
         const response = await fetch(`http://localhost:3000/api/diaries?date=${encodeURIComponent(rawDate)}`, {
           method: 'GET',
@@ -37,6 +41,7 @@ console.log(temp);
         const data = await response.json();
         console.log('Diary data:', data);
         setDiaryData(data);
+
       } catch (error: any) {
         console.error('Error fetching diaries:', error.message);
       }
@@ -52,6 +57,8 @@ console.log(temp);
   const handleEdit = (item: any) => {
     console.log("Editing diary:", item);
     // Ví dụ: navigation.navigate("EditDiary", { diary: item });
+    //Navigation.navigate('PostDiary', { diary: item });
+    navigation.navigate('postdiary', { diary: item });
   };
 
   const handleDelete = async (id: string) => {
@@ -62,6 +69,7 @@ console.log(temp);
       if (res.ok) {
         setDiaryData(prev => prev.filter((d: any) => d.id !== id));
         setTriggerXoa(prev => !prev); 
+        
       } else {
         console.log("Delete failed");
       }
