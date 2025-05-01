@@ -70,6 +70,13 @@ export default function TabLayout() {
         tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
       }}
     />
+    <Tabs.Screen
+      name="CoupleFund"
+      options={{
+        title: 'CoupleFund',
+        tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+      }}
+    />
   
        
     </Tabs>
