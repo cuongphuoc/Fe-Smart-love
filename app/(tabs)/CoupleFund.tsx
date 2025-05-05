@@ -1,19 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
   FlatList,
-  StyleSheet,
   SafeAreaView,
   Dimensions,
   ScrollView,
   Modal,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { FontAwesome5, FontAwesome } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { styles } from '../../assets/styles/CoupleFundStyle';
 
 interface Fund {
   id: string;
@@ -28,29 +31,53 @@ interface Fund {
   description: string;
 }
 
-const formatAmount = (amount: string) => {
-  // Remove non-numeric characters except dots
-  const cleanAmount = amount.replace(/[^0-9.]/g, '');
-  if (!cleanAmount) return '0đ';
+const formatNumberWithDots = (number: string): string => {
+  // Loại bỏ ký tự không phải số
+  const cleanNumber = number.replace(/[^\d]/g, '');
+  // Chuyển thành mảng ký tự và đảo ngược
+  const chars = cleanNumber.split('').reverse();
+  // Thêm dấu chấm sau mỗi 3 số
+  const withDots = chars.reduce((acc, curr, i) => {
+    if (i > 0 && i % 3 === 0) {
+      return curr + '.' + acc;
+    }
+    return curr + acc;
+  }, '');
+  return withDots || '0';
+};
 
-  // Convert to number and format with thousand separators
-  const num = parseFloat(cleanAmount);
-  if (isNaN(num)) return '0đ';
+const formatAmount = (amount: string): string => {
+  return `${formatNumberWithDots(amount)}đ`;
+};
 
-  // Format with thousand separators
-  const parts = num.toString().split('.');
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const parseAmount = (formattedAmount: string): number => {
+  // Loại bỏ dấu chấm và ký tự đ
+  const numberStr = formattedAmount.replace(/\./g, '').replace('đ', '');
+  return parseInt(numberStr, 10) || 0;
+};
 
-  // Add decimal part if exists
-  const formatted = parts.join('.');
-  return `${formatted}đ`;
+const calculateProgress = (current: string, target: string): number => {
+  const currentAmount = parseAmount(current);
+  const targetAmount = parseAmount(target);
+  
+  if (targetAmount === 0) return 0;
+  const percentage = (currentAmount / targetAmount) * 100;
+  return Math.min(Math.max(percentage, 0), 100);
+};
+
+const handleAmountInput = (text: string, type: 'current' | 'target', setState: any) => {
+  const formattedNumber = formatNumberWithDots(text);
+  setState((prev: any) => ({
+    ...prev,
+    [type === 'current' ? 'currentAmount' : 'targetAmount']: formattedNumber
+  }));
 };
 
 const fundData: Fund[] = [
   {
     id: '1',
     image: 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
-    amount: '123.456đ',
+    amount: '0',
     targetAmount: '1.500.000đ',
     avatars: [
       'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
@@ -65,7 +92,7 @@ const fundData: Fund[] = [
   {
     id: '2',
     image: 'https://storage.googleapis.com/a1aa/image/c6359d24-dc89-42f7-7fdc-e5ed61131450.jpg',
-    amount: '2.123.456đ',
+    amount: '500.000',
     targetAmount: '5.000.000đ',
     avatars: [
       'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
@@ -80,7 +107,7 @@ const fundData: Fund[] = [
   {
     id: '3',
     image: 'https://storage.googleapis.com/a1aa/image/2bb242ab-4fef-4645-afc1-9326f0296d2d.jpg',
-    amount: '1.123.456đ',
+    amount: '300.000',
     targetAmount: '3.000.000đ',
     avatars: [
       'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
@@ -93,6 +120,8 @@ const fundData: Fund[] = [
     description: "Let's create goals and make dreams come true",
   },
 ];
+
+const STORAGE_KEY = 'couple_funds_data';
 
 const CoupleFundScreen: React.FC = () => {
   const [selectedFund, setSelectedFund] = useState<Fund | null>(null);
@@ -107,26 +136,38 @@ const CoupleFundScreen: React.FC = () => {
   const [newFund, setNewFund] = useState({
     title: '',
     description: '',
-    currentAmount: '0',
+    currentAmount: '',
     targetAmount: '',
   });
   const [funds, setFunds] = useState<Fund[]>(fundData);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const calculateProgress = (current: string, target: string) => {
-    // Remove all non-numeric characters except dots
-    const currentClean = current.replace(/[^0-9.]/g, '');
-    const targetClean = target.replace(/[^0-9.]/g, '');
-    
-    // Convert to numbers
-    const currentNum = parseFloat(currentClean) || 0;
-    const targetNum = parseFloat(targetClean) || 1;
-    
-    // Calculate percentage and ensure it's between 0 and 100
-    const percentage = (currentNum / targetNum) * 100;
-    return Math.min(Math.max(percentage, 0), 100);
+  useEffect(() => {
+    loadFundsData();
+  }, []);
+
+  const loadFundsData = async () => {
+    try {
+      const storedData = await AsyncStorage.getItem(STORAGE_KEY);
+      if (storedData) {
+        setFunds(JSON.parse(storedData));
+      }
+    } catch (error) {
+      console.error('Error loading funds:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEditFund = () => {
+  const saveFundsData = async (updatedFunds: Fund[]) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedFunds));
+    } catch (error) {
+      console.error('Error saving funds:', error);
+    }
+  };
+
+  const handleEditFund = async () => {
     if (!selectedFund || !editingFund.title || !editingFund.targetAmount) {
       Alert.alert('Missing information', 'Please fill in all required fields');
       return;
@@ -149,6 +190,8 @@ const CoupleFundScreen: React.FC = () => {
     });
 
     setFunds(updatedFunds);
+    await saveFundsData(updatedFunds);
+
     setSelectedFund(prev => prev ? {
       ...prev,
       title: editingFund.title,
@@ -159,23 +202,22 @@ const CoupleFundScreen: React.FC = () => {
     setIsEditMode(false);
   };
 
-  const handleCreateFund = () => {
+  const handleCreateFund = async () => {
     if (!newFund.title || !newFund.targetAmount) {
       Alert.alert('Missing information', 'Please fill in all required fields');
       return;
     }
 
-    const formattedAmount = newFund.currentAmount.endsWith('đ') 
-      ? newFund.currentAmount 
-      : `${newFund.currentAmount}đ`;
+    const formattedAmount = formatAmount(newFund.currentAmount);
+    const formattedTargetAmount = formatAmount(newFund.targetAmount);
 
     const newFundData: Fund = {
-      id: (funds.length + 1).toString(),
+      id: Date.now().toString(),
       title: newFund.title,
       description: newFund.description || "Let's create goals and make dreams come true",
-      image: 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg', // Default image
+      image: 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
       amount: formattedAmount,
-      targetAmount: newFund.targetAmount,
+      targetAmount: formattedTargetAmount,
       avatars: [
         'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
         'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
@@ -185,15 +227,43 @@ const CoupleFundScreen: React.FC = () => {
       altAvatar2: 'Avatar of person 2',
     };
 
-    setFunds([...funds, newFundData]);
+    const updatedFunds = [...funds, newFundData];
+    setFunds(updatedFunds);
+    await saveFundsData(updatedFunds);
     
     setNewFund({
       title: '',
       description: '',
-      currentAmount: '0',
+      currentAmount: '',
       targetAmount: '',
     });
     setIsModalVisible(false);
+  };
+
+  const handleDeleteFund = async () => {
+    if (!selectedFund) return;
+
+    Alert.alert(
+      'Delete Fund',
+      'Are you sure you want to delete this fund? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const updatedFunds = funds.filter(fund => fund.id !== selectedFund.id);
+            setFunds(updatedFunds);
+            await saveFundsData(updatedFunds);
+            setSelectedFund(null);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const renderFundItem = ({ item }: { item: Fund }) => (
@@ -239,7 +309,7 @@ const CoupleFundScreen: React.FC = () => {
           <FontAwesome5 name="chevron-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.detailHeaderTitle}>
-          Building a common future
+          {selectedFund?.title || ''}
         </Text>
         <TouchableOpacity 
           accessibilityLabel="Edit"
@@ -268,10 +338,20 @@ const CoupleFundScreen: React.FC = () => {
           />
           <TouchableOpacity
             style={styles.changePhotoButton}
+            activeOpacity={0.8}
             accessibilityLabel="Change photo"
           >
-            <FontAwesome5 name="camera" size={12} color="#4B5563" style={styles.changePhotoIcon} />
-            <Text style={styles.changePhotoText}>Change photo</Text>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.changePhotoGradient}
+            >
+              <View style={styles.changePhotoIconContainer}>
+                <FontAwesome5 name="camera" size={14} color="#EC4899" />
+              </View>
+              <Text style={styles.changePhotoText}>Change photo</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -317,17 +397,17 @@ const CoupleFundScreen: React.FC = () => {
                   multiline
                 />
                 <TextInput
-                  style={[styles.input, { marginTop: 10 }]}
+                  style={styles.amountInput}
                   placeholder="Current Amount"
-                  value={editingFund.currentAmount}
-                  onChangeText={(text) => setEditingFund(prev => ({ ...prev, currentAmount: text }))}
+                  value={`${editingFund.currentAmount}`}
+                  onChangeText={(text) => handleAmountInput(text, 'current', setEditingFund)}
                   keyboardType="numeric"
                 />
                 <TextInput
-                  style={[styles.input, { marginTop: 10 }]}
+                  style={styles.amountInput}
                   placeholder="Target Amount"
-                  value={editingFund.targetAmount}
-                  onChangeText={(text) => setEditingFund(prev => ({ ...prev, targetAmount: text }))}
+                  value={`${editingFund.targetAmount}`}
+                  onChangeText={(text) => handleAmountInput(text, 'target', setEditingFund)}
                   keyboardType="numeric"
                 />
                 <View style={styles.editButtons}>
@@ -382,6 +462,16 @@ const CoupleFundScreen: React.FC = () => {
               <Text style={styles.optionText}>Payment,{'\n'}money transfer</Text>
             </View>
           </View>
+
+          {!isEditMode && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={handleDeleteFund}
+            >
+              <FontAwesome5 name="trash-alt" size={16} color="#FFFFFF" />
+              <Text style={styles.deleteButtonText}>Delete Fund</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -406,8 +496,19 @@ const CoupleFundScreen: React.FC = () => {
           <TouchableOpacity 
             style={styles.fundCreationButton}
             onPress={() => setIsModalVisible(true)}
+            activeOpacity={0.8}
           >
-            <Text style={styles.fundCreationText}>Create new fund ({funds.length}/10)</Text>
+            <LinearGradient
+              colors={['#F9A1B7', '#EC4899']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientButton}
+            >
+              <FontAwesome5 name="plus-circle" size={16} color="#FFFFFF" />
+              <Text style={styles.fundCreationText}>
+                Create new fund ({funds.length}/10)
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -446,18 +547,18 @@ const CoupleFundScreen: React.FC = () => {
             />
             
             <TextInput
-              style={styles.input}
-              placeholder="Initial Amount"
-              value={newFund.currentAmount}
-              onChangeText={(text) => setNewFund({...newFund, currentAmount: text})}
+              style={styles.amountInput}
+              placeholder="Current Amount"
+              value={`${newFund.currentAmount}`}
+              onChangeText={(text) => handleAmountInput(text, 'current', setNewFund)}
               keyboardType="numeric"
             />
             
             <TextInput
-              style={styles.input}
+              style={styles.amountInput}
               placeholder="Target Amount"
-              value={newFund.targetAmount}
-              onChangeText={(text) => setNewFund({...newFund, targetAmount: text})}
+              value={`${newFund.targetAmount}`}
+              onChangeText={(text) => handleAmountInput(text, 'target', setNewFund)}
               keyboardType="numeric"
             />
             
@@ -469,7 +570,7 @@ const CoupleFundScreen: React.FC = () => {
                   setNewFund({
                     title: '',
                     description: '',
-                    currentAmount: '0',
+                    currentAmount: '',
                     targetAmount: '',
                   });
                 }}
@@ -490,400 +591,15 @@ const CoupleFundScreen: React.FC = () => {
     </SafeAreaView>
   );
 
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#EC4899" />
+      </View>
+    );
+  }
+
   return selectedFund ? renderFundDetail() : renderFundList();
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F3F4F6', // bg-gray-100
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#EC4899', // bg-pink-600
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 45,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    flex: 1,
-    fontFamily: 'Roboto',
-  },
-  main: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 96, // Space for bottom nav
-  },
-  fundCreationButtonContainer: {
-    alignItems: 'flex-end',
-    marginBottom: 12,
-  },
-  fundCreationButton: {
-    backgroundColor: '#E5E7EB', // bg-gray-200
-    borderRadius: 9999, // rounded-full
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#D1D5DB', // border-gray-300
-  },
-  fundCreationText: {
-    fontSize: 12,
-    color: '#374151', // text-gray-700
-    fontWeight: '500',
-  },
-  cardList: {
-    paddingBottom: 16,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-    marginBottom: 20,
-    overflow: 'hidden',
-  },
-  cardImage: {
-    width: '100%',
-    height: 150,
-    resizeMode: 'cover',
-  },
-  cardTitleContainer: {
-    width: '100%',
-    padding: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    textAlign: 'left',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-  cardAmount: {
-    fontSize: 14,
-    color: '#EC4899',
-    fontWeight: '500',
-  },
-  avatarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    marginLeft: -8, // Để các avatar chồng lên nhau
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  detailContainer: {
-    flex: 1,
-    backgroundColor: '#F0EFEE', // bg-[#f0efee]
-  },
-  detailHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#EC4899', //
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 45,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  detailHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    flex: 1,
-    fontFamily: 'Roboto',
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  imageContainer: {
-    position: 'relative',
-    width: '100%',
-    height: 200,
-    marginBottom: 16, // Thêm khoảng cách giữa ảnh và card
-  },
-  backgroundImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  changePhotoButton: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  changePhotoIcon: {
-    marginRight: 4,
-  },
-  changePhotoText: {
-    fontSize: 12,
-    color: '#4B5563', // text-gray-600
-    fontWeight: '500',
-  },
-  detailCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 20, // Thêm margin bottom để tránh che khuất nội dung cuối
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-    alignSelf: 'center',
-    maxWidth: 448,
-    width: '100%',
-  },
-  fundInfo: {
-    marginBottom: 20,
-  },
-  fundBalanceLabel: {
-    fontSize: 12,
-    color: '#6B7280', // text-gray-500
-    marginBottom: 4,
-  },
-  fundBalanceAmount: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  fundDescription: {
-    fontSize: 12,
-    color: '#4B5563', // text-gray-600
-  },
-  actionSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F9A1B7', // Fallback for gradient
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    flex: 1,
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  fundButton: {
-    backgroundColor: '#F9A1B7', // bg-[#f9a1b7]
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fundButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F75A7C', // text-[#f75a7c]
-  },
-  buttonIcon: {
-    marginRight: 8,
-  },
-  optionsSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  optionItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  optionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#E6003F', // text-[#e6003f]
-    textAlign: 'center',
-  },
-  detailBottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB', // border-gray-200
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 12,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    maxWidth: 448,
-    alignSelf: 'center',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    width: '80%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  input: {
-    width: '100%',
-    height: 40,
-    borderColor: '#D1D5DB',
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    marginBottom: 12,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
-    backgroundColor: '#EC4899',
-    borderRadius: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  modalButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  editButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    gap: 12,
-  },
-  editButton: {
-    flex: 1,
-    backgroundColor: '#EC4899',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  editButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  progressContainer: {
-    marginVertical: 16,
-  },
-  progressBar: {
-    width: '100%',
-    height: 8,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#EC4899',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#EC4899',
-    textAlign: 'right',
-  },
-  amountContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingHorizontal: 8,
-  },
-  amountBox: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  amountLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
-  targetAmount: {
-    fontSize: 12,
-    color: '#EC4899',
-    fontWeight: '600',
-  },
-});
 
 export default CoupleFundScreen;
