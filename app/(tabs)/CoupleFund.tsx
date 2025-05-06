@@ -17,6 +17,7 @@ import { FontAwesome5, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from '../../assets/styles/CoupleFundStyle';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Fund {
   id: string;
@@ -141,6 +142,14 @@ const CoupleFundScreen: React.FC = () => {
   });
   const [funds, setFunds] = useState<Fund[]>(fundData);
   const [isLoading, setIsLoading] = useState(true);
+  const insets = useSafeAreaInsets();
+  
+  // Thêm paddingBottom động dựa trên insets
+  const dynamicStyles = {
+    listContainer: {
+      paddingBottom: insets.bottom + 70, // 70 là chiều cao của bottom tab
+    }
+  };
 
   useEffect(() => {
     loadFundsData();
@@ -329,7 +338,14 @@ const CoupleFundScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingBottom: 120, // Thêm padding bottom để tránh bị che khuất
+        }}
+      >
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: selectedFund?.image }}
@@ -435,15 +451,26 @@ const CoupleFundScreen: React.FC = () => {
 
           <View style={styles.actionSection}>
             <View style={styles.iconCircle}>
-              <FontAwesome5 name="dollar-sign" size={20} color="#FFFFFF" />
+              <FontAwesome5 name="dollar-sign" size={18} color="#FFFFFF" />
             </View>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.fundButton}>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity 
+                style={styles.fundButton}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.fundButtonText}>+ Fund</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.fundButton}>
-                <FontAwesome5 name="credit-card" size={14} color="#F75A7C" style={styles.buttonIcon} />
-                <Text style={styles.fundButtonText}>Withdraw funds</Text>
+              <TouchableOpacity 
+                style={styles.fundButton}
+                activeOpacity={0.7}
+              >
+                <FontAwesome5 
+                  name="credit-card" 
+                  size={12} 
+                  color="#F75A7C" 
+                  style={styles.buttonIcon} 
+                />
+                <Text style={styles.fundButtonText}>Withdraw</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -479,7 +506,6 @@ const CoupleFundScreen: React.FC = () => {
 
   const renderFundList = () => (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity accessibilityLabel="Back">
           <FontAwesome5 name="chevron-left" size={20} color="#FFFFFF" />
@@ -490,7 +516,6 @@ const CoupleFundScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Main Content */}
       <View style={styles.main}>
         <View style={styles.fundCreationButtonContainer}>
           <TouchableOpacity 
@@ -516,78 +541,17 @@ const CoupleFundScreen: React.FC = () => {
           data={funds}
           renderItem={renderFundItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.cardList}
+          contentContainerStyle={[styles.cardList, dynamicStyles.listContainer]}
+          showsVerticalScrollIndicator={true}
+          bounces={false}
+          overScrollMode="never"
+          removeClippedSubviews={true}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          ListFooterComponent={<View style={{ height: 80 }} />}
         />
       </View>
-
-      {/* Create Fund Modal */}
-      <Modal
-        visible={isModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Create New Fund</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Fund Title"
-              value={newFund.title}
-              onChangeText={(text) => setNewFund({...newFund, title: text})}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Description (optional)"
-              value={newFund.description}
-              onChangeText={(text) => setNewFund({...newFund, description: text})}
-              multiline
-            />
-            
-            <TextInput
-              style={styles.amountInput}
-              placeholder="Current Amount"
-              value={`${newFund.currentAmount}`}
-              onChangeText={(text) => handleAmountInput(text, 'current', setNewFund)}
-              keyboardType="numeric"
-            />
-            
-            <TextInput
-              style={styles.amountInput}
-              placeholder="Target Amount"
-              value={`${newFund.targetAmount}`}
-              onChangeText={(text) => handleAmountInput(text, 'target', setNewFund)}
-              keyboardType="numeric"
-            />
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#9CA3AF' }]}
-                onPress={() => {
-                  setIsModalVisible(false);
-                  setNewFund({
-                    title: '',
-                    description: '',
-                    currentAmount: '',
-                    targetAmount: '',
-                  });
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.modalButton}
-                onPress={handleCreateFund}
-              >
-                <Text style={styles.modalButtonText}>Create</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 

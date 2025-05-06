@@ -1,4 +1,8 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
+
+const { width } = Dimensions.get('window');
+const SCREEN_PADDING = 16;
+const CARD_WIDTH = width - (SCREEN_PADDING * 2);
 
 export const styles = StyleSheet.create({
   container: {
@@ -31,7 +35,8 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 96, // Space for bottom nav
+    // Thay đổi paddingBottom để tránh bị che khuất
+    paddingBottom: 16,
   },
   fundCreationButtonContainer: {
     alignItems: 'flex-end',
@@ -61,7 +66,8 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   cardList: {
-    paddingBottom: 16,
+    // Thêm paddingBottom cho FlatList
+    paddingBottom: 120, // Tăng padding bottom để tránh bị che khuất bởi bottom tab
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -155,8 +161,8 @@ export const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
-    width: '100%',
-    height: 200,
+    width: width, // Full width của màn hình
+    height: width * 0.5, // Tỷ lệ 2:1
     marginBottom: 16, // Thêm khoảng cách giữa ảnh và card
   },
   backgroundImage: {
@@ -200,8 +206,8 @@ export const styles = StyleSheet.create({
   detailCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 16,
+    padding: 16, // Giảm padding từ 20 xuống 16
+    marginHorizontal: SCREEN_PADDING,
     marginBottom: 20, // Thêm margin bottom để tránh che khuất nội dung cuối
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -209,8 +215,7 @@ export const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
     alignSelf: 'center',
-    maxWidth: 448,
-    width: '100%',
+    width: CARD_WIDTH, // Đặt chiều rộng dựa trên màn hình
   },
   fundInfo: {
     marginBottom: 20,
@@ -221,7 +226,7 @@ export const styles = StyleSheet.create({
     marginBottom: 4,
   },
   fundBalanceAmount: {
-    fontSize: 20,
+    fontSize: 16, // Giảm font size
     color: '#111827',
     fontWeight: '600',
   },
@@ -236,9 +241,9 @@ export const styles = StyleSheet.create({
     marginBottom: 20,
   },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40, // Giảm kích thước
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#F9A1B7', // Fallback for gradient
     justifyContent: 'center',
     alignItems: 'center',
@@ -247,19 +252,20 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     flex: 1,
     justifyContent: 'flex-end',
-    gap: 12,
+    gap: 8, // Giảm gap từ 12 xuống 8
   },
   fundButton: {
     backgroundColor: '#F9A1B7', // bg-[#f9a1b7]
     borderRadius: 8,
     paddingVertical: 8,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16, // Giảm padding ngang
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    minWidth: 80, // Đặt chiều rộng tối thiểu
   },
   fundButtonText: {
-    fontSize: 14,
+    fontSize: 13, // Giảm font size
     fontWeight: '600',
     color: '#F75A7C', // text-[#f75a7c]
   },
@@ -269,14 +275,16 @@ export const styles = StyleSheet.create({
   optionsSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: 8, // Thêm padding để các options không sát viền
   },
   optionItem: {
     flex: 1,
     alignItems: 'center',
     gap: 4,
+    paddingHorizontal: 4, // Thêm padding ngang
   },
   optionText: {
-    fontSize: 12,
+    fontSize: 11, // Giảm font size
     fontWeight: '600',
     color: '#E6003F', // text-[#e6003f]
     textAlign: 'center',
@@ -368,8 +376,8 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   progressContainer: {
-    marginTop: 24,
-    marginBottom: 16,
+    marginTop: 16, // Giảm margin
+    marginBottom: 12,
   },
   progressBar: {
     width: '100%',
@@ -396,15 +404,15 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
     backgroundColor: '#F9FAFB',
-    padding: 16,
+    padding: 12, // Giảm padding
     borderRadius: 12,
   },
   amountBox: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4, // Giảm padding
   },
   amountLabel: {
     fontSize: 14,
@@ -445,5 +453,18 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  listContainer: {
+    flexGrow: 1,
+  },
+  // Thêm styles mới cho responsive
+  detailContent: {
+    width: '100%',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap', // Cho phép wrap khi không đủ space
+    justifyContent: 'flex-end',
+    gap: 8,
   },
 });
