@@ -1,4 +1,4 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, ViewStyle } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const SCREEN_PADDING = 16;
@@ -14,25 +14,27 @@ const COLORS = {
   background: '#F3F4F6',
 };
 
+const commonHeaderStyles: ViewStyle = {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  backgroundColor: COLORS.primary,
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  paddingTop: 45,
+  elevation: 4,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+};
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6', // bg-gray-100
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 45,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
+  header: commonHeaderStyles,
   headerTitle: {
     fontSize: 18,
     fontWeight: '400',
@@ -144,20 +146,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F0EFEE', // bg-[#f0efee]
   },
-  detailHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 45,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
+  detailHeader: commonHeaderStyles,
   detailHeaderTitle: {
     fontSize: 18,
     fontWeight: '400',
@@ -325,7 +314,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  modalContent: {
+  popupModalContent: {
     width: '80%',
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
@@ -336,12 +325,6 @@ export const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
   input: {
     width: '100%',
     height: 40,
@@ -350,21 +333,6 @@ export const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 8,
     marginBottom: 12,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
-    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
-    borderRadius: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  modalButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
   editButtons: {
     flexDirection: 'row',
@@ -400,8 +368,12 @@ export const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
     borderRadius: 4,
-    // React Native doesn't support CSS transitions
-    // Use Animated API instead for animations
+    // Thêm hiệu ứng shadow để trông nổi bật hơn
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 3,
+    elevation: 3,
   },
   progressText: {
     fontSize: 14,
@@ -442,6 +414,15 @@ export const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     color: '#111827',
   },
+  amountInputContainer: {
+    marginBottom: 16,
+  },
+  amountInputLabel: {
+    fontSize: 14,
+    color: '#4B5563',
+    fontWeight: '500',
+    marginBottom: 8,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -476,5 +457,138 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap', // Cho phép wrap khi không đủ space
     justifyContent: 'flex-end',
     gap: 8,
+  },
+  searchContainer: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 40,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#111827',
+  },
+  searchIcon: {
+    width: 16,
+    height: 16,
+  },
+  clearButton: {
+    padding: 4,
+  },
+  cancelButton: {
+    paddingVertical: 8,
+  },
+  cancelButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'center',
+  },
+  createdDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    flexWrap: 'wrap', // Cho phép wrap khi không đủ space
+  },
+  dateItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 16,
+    marginBottom: 8, // Thêm margin bottom nếu wrap
+  },
+  createdDateText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  cardDate: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end', // Modal sẽ slide up từ dưới
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  modalInput: {
+    width: '100%',
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#EE1D52',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

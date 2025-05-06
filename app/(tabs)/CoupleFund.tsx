@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Animated,
+  Easing
 } from 'react-native';
 import { FontAwesome5, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from '../../assets/styles/CoupleFundStyle';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+// Cập nhật interface Fund
 interface Fund {
   id: string;
   image: string;
@@ -30,13 +33,21 @@ interface Fund {
   altAvatar2: string;
   title: string;
   description: string;
+  createdAt: string;
+  modifiedAt?: string; // Thêm trường ngày sửa đổi (có thể null)
 }
 
+// Sửa hàm formatNumberWithDots để trả về chuỗi rỗng thay vì "0"
 const formatNumberWithDots = (number: string): string => {
   // Loại bỏ ký tự không phải số
   const cleanNumber = number.replace(/[^\d]/g, '');
+  
+  // Trả về chuỗi rỗng nếu không có số
+  if (!cleanNumber) return '';
+  
   // Chuyển thành mảng ký tự và đảo ngược
   const chars = cleanNumber.split('').reverse();
+  
   // Thêm dấu chấm sau mỗi 3 số
   const withDots = chars.reduce((acc, curr, i) => {
     if (i > 0 && i % 3 === 0) {
@@ -44,11 +55,14 @@ const formatNumberWithDots = (number: string): string => {
     }
     return curr + acc;
   }, '');
-  return withDots || '0';
+  
+  return withDots;
 };
 
+// Sửa hàm formatAmount để xử lý chuỗi rỗng
 const formatAmount = (amount: string): string => {
-  return `${formatNumberWithDots(amount)}đ`;
+  const formattedNumber = formatNumberWithDots(amount);
+  return formattedNumber ? `${formattedNumber}đ` : '';
 };
 
 const parseAmount = (formattedAmount: string): number => {
@@ -66,7 +80,16 @@ const calculateProgress = (current: string, target: string): number => {
   return Math.min(Math.max(percentage, 0), 100);
 };
 
+// Cập nhật hàm handleAmountInput để xử lý khi input rỗng
 const handleAmountInput = (text: string, type: 'current' | 'target', setState: any) => {
+  if (!text.trim()) {
+    setState((prev: any) => ({
+      ...prev,
+      [type === 'current' ? 'currentAmount' : 'targetAmount']: ''
+    }));
+    return;
+  }
+  
   const formattedNumber = formatNumberWithDots(text);
   setState((prev: any) => ({
     ...prev,
@@ -89,6 +112,7 @@ const fundData: Fund[] = [
     altAvatar2: 'Avatar of person 2 with black hair and hat',
     title: 'Vacation Fund',
     description: "Let's create goals and make dreams come true",
+    createdAt: '01/01/2023 - 08:30',
   },
   {
     id: '2',
@@ -104,6 +128,7 @@ const fundData: Fund[] = [
     altAvatar2: 'Avatar of person 2 with black hair and hat',
     title: 'Emergency Fund',
     description: "Let's create goals and make dreams come true",
+    createdAt: '02/01/2023 - 14:45',
   },
   {
     id: '3',
@@ -119,12 +144,17 @@ const fundData: Fund[] = [
     altAvatar2: 'Avatar of person 2 with black hair and hat',
     title: 'Savings Fund',
     description: "Let's create goals and make dreams come true",
+    createdAt: '03/01/2023 - 10:15',
   },
 ];
 
 const STORAGE_KEY = 'couple_funds_data';
 
 const CoupleFundScreen: React.FC = () => {
+  // Thêm state và ref mới
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+
   const [selectedFund, setSelectedFund] = useState<Fund | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -150,6 +180,11 @@ const CoupleFundScreen: React.FC = () => {
       paddingBottom: insets.bottom + 70, // 70 là chiều cao của bottom tab
     }
   };
+
+  // Thêm state cho chức năng tìm kiếm
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredFunds, setFilteredFunds] = useState<Fund[]>([]);
 
   useEffect(() => {
     loadFundsData();
@@ -177,77 +212,100 @@ const CoupleFundScreen: React.FC = () => {
   };
 
   const handleEditFund = async () => {
-    if (!selectedFund || !editingFund.title || !editingFund.targetAmount) {
-      Alert.alert('Missing information', 'Please fill in all required fields');
-      return;
+  if (!selectedFund || !editingFund.title || !editingFund.targetAmount) {
+    Alert.alert('Missing information', 'Please fill in all required fields');
+    return;
+  }
+
+  // Nếu currentAmount rỗng, gán là "0đ"
+  const formattedCurrentAmount = editingFund.currentAmount ? formatAmount(editingFund.currentAmount) : "0đ";
+  const formattedTargetAmount = formatAmount(editingFund.targetAmount);
+  const currentDate = new Date();
+
+  const updatedFunds = funds.map(fund => {
+    if (fund.id === selectedFund.id) {
+      return {
+        ...fund,
+        title: editingFund.title,
+        description: editingFund.description || fund.description,
+        amount: formattedCurrentAmount,
+        targetAmount: formattedTargetAmount,
+        modifiedAt: formatDateTime(currentDate), // Sử dụng formatDateTime
+      };
     }
+    return fund;
+  });
 
-    const formattedCurrentAmount = formatAmount(editingFund.currentAmount);
-    const formattedTargetAmount = formatAmount(editingFund.targetAmount);
+  setFunds(updatedFunds);
+  await saveFundsData(updatedFunds);
 
-    const updatedFunds = funds.map(fund => {
-      if (fund.id === selectedFund.id) {
-        return {
-          ...fund,
-          title: editingFund.title,
-          description: editingFund.description || fund.description,
-          amount: formattedCurrentAmount,
-          targetAmount: formattedTargetAmount,
-        };
-      }
-      return fund;
-    });
+  setSelectedFund(prev => prev ? {
+    ...prev,
+    title: editingFund.title,
+    description: editingFund.description || prev.description,
+    amount: formattedCurrentAmount,
+    targetAmount: formattedTargetAmount,
+    modifiedAt: formatDateTime(currentDate), // Sử dụng formatDateTime
+  } : null);
+  setIsEditMode(false);
+};
 
-    setFunds(updatedFunds);
-    await saveFundsData(updatedFunds);
+  // Cập nhật hàm format date để thêm giờ phút
+const formatDateTime = (date: Date): string => {
+  const dateStr = date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+  
+  const timeStr = date.toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  return `${dateStr} - ${timeStr}`;
+};
 
-    setSelectedFund(prev => prev ? {
-      ...prev,
-      title: editingFund.title,
-      description: editingFund.description || prev.description,
-      amount: formattedCurrentAmount,
-      targetAmount: formattedTargetAmount,
-    } : null);
-    setIsEditMode(false);
+const handleCreateFund = async () => {
+  if (!newFund.title || !newFund.targetAmount) {
+    Alert.alert('Missing information', 'Please fill in all required fields');
+    return;
+  }
+
+  // Nếu currentAmount rỗng, gán là "0đ"
+  const formattedAmount = newFund.currentAmount ? formatAmount(newFund.currentAmount) : "0đ";
+  const formattedTargetAmount = formatAmount(newFund.targetAmount);
+  const currentDate = new Date();
+
+  const newFundData: Fund = {
+    id: Date.now().toString(),
+    title: newFund.title,
+    description: newFund.description || "Let's create goals and make dreams come true",
+    image: 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
+    amount: formattedAmount,
+    targetAmount: formattedTargetAmount,
+    avatars: [
+      'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
+      'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
+    ],
+    altImage: 'Default fund image',
+    altAvatar1: 'Avatar of person 1',
+    altAvatar2: 'Avatar of person 2',
+    createdAt: formatDateTime(currentDate), // Sử dụng formatDateTime
   };
 
-  const handleCreateFund = async () => {
-    if (!newFund.title || !newFund.targetAmount) {
-      Alert.alert('Missing information', 'Please fill in all required fields');
-      return;
-    }
-
-    const formattedAmount = formatAmount(newFund.currentAmount);
-    const formattedTargetAmount = formatAmount(newFund.targetAmount);
-
-    const newFundData: Fund = {
-      id: Date.now().toString(),
-      title: newFund.title,
-      description: newFund.description || "Let's create goals and make dreams come true",
-      image: 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
-      amount: formattedAmount,
-      targetAmount: formattedTargetAmount,
-      avatars: [
-        'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
-        'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
-      ],
-      altImage: 'Default fund image',
-      altAvatar1: 'Avatar of person 1',
-      altAvatar2: 'Avatar of person 2',
-    };
-
-    const updatedFunds = [...funds, newFundData];
-    setFunds(updatedFunds);
-    await saveFundsData(updatedFunds);
-    
-    setNewFund({
-      title: '',
-      description: '',
-      currentAmount: '',
-      targetAmount: '',
-    });
-    setIsModalVisible(false);
-  };
+  const updatedFunds = [...funds, newFundData];
+  setFunds(updatedFunds);
+  await saveFundsData(updatedFunds);
+  
+  setNewFund({
+    title: '',
+    description: '',
+    currentAmount: '',
+    targetAmount: '',
+  });
+  setIsModalVisible(false);
+};
 
   const handleDeleteFund = async () => {
     if (!selectedFund) return;
@@ -275,10 +333,66 @@ const CoupleFundScreen: React.FC = () => {
     );
   };
 
+  // Thêm hàm xử lý tìm kiếm
+  const handleSearch = useCallback((text: string) => {
+    setSearchQuery(text);
+    if (text.trim() === '') {
+      setFilteredFunds(funds);
+      return;
+    }
+
+    const searchResults = funds.filter(fund => 
+      fund.title.toLowerCase().includes(text.toLowerCase()) ||
+      fund.description.toLowerCase().includes(text.toLowerCase()) ||
+      fund.amount.includes(text) ||
+      fund.targetAmount.includes(text) ||
+      fund.createdAt.includes(text) // Thêm tìm kiếm theo ngày
+    );
+    setFilteredFunds(searchResults);
+  }, [funds]);
+
+  // Thêm useEffect để khởi tạo filteredFunds
+  useEffect(() => {
+    setFilteredFunds(funds);
+  }, [funds]);
+
+  // Sửa hàm xử lý khi chọn fund
+  const handleSelectFund = (item: Fund) => {
+    const scrollResponder = flatListRef.current?.getScrollResponder();
+    if (scrollResponder && 'getScrollableNode' in scrollResponder) {
+      // @ts-ignore - getScrollableNode exists but TypeScript doesn't recognize it
+      const node = scrollResponder.getScrollableNode();
+      if (node && node.contentOffset) {
+        setScrollPosition(node.contentOffset.y);
+      }
+    } else {
+      // Fallback to get current scroll position
+      const offset = flatListRef.current?.props.contentOffset?.y || 0;
+      setScrollPosition(offset);
+    }
+    setSelectedFund(item);
+  };
+
+  // Sửa hàm xử lý khi quay lại
+  const handleBackFromDetail = () => {
+    setSelectedFund(null);
+    setIsEditMode(false);
+    setEditingFund({ title: '', description: '', currentAmount: '', targetAmount: '' });
+    
+    // Khôi phục vị trí cuộn sau khi component rerender
+    setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ 
+        offset: scrollPosition, 
+        animated: false 
+      });
+    }, 100);
+  };
+
+  // Sửa lại trong renderFundItem
   const renderFundItem = ({ item }: { item: Fund }) => (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => setSelectedFund(item)}
+      onPress={() => handleSelectFund(item)}
     >
       <Image
         source={{ uri: item.image }}
@@ -287,6 +401,8 @@ const CoupleFundScreen: React.FC = () => {
       />
       <View style={styles.cardTitleContainer}>
         <Text style={styles.cardTitle}>{item.title}</Text>
+        {/* Thêm hiển thị ngày */}
+        <Text style={styles.cardDate}>{item.createdAt}</Text>
       </View>
       <View style={styles.cardFooter}>
         <Text style={styles.cardAmount}>{item.amount}</Text>
@@ -304,16 +420,13 @@ const CoupleFundScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
+  // Sửa lại trong renderFundDetail
   const renderFundDetail = () => (
     <SafeAreaView style={styles.detailContainer}>
       <View style={styles.detailHeader}>
         <TouchableOpacity
           accessibilityLabel="Back"
-          onPress={() => {
-            setSelectedFund(null);
-            setIsEditMode(false);
-            setEditingFund({ title: '', description: '', currentAmount: '', targetAmount: '' });
-          }}
+          onPress={handleBackFromDetail}
         >
           <FontAwesome5 name="chevron-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -366,20 +479,40 @@ const CoupleFundScreen: React.FC = () => {
 
         <View style={styles.detailCard}>
           <View style={styles.fundInfo}>
-            <Text style={styles.fundBalanceLabel}>Fund Progress</Text>
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View 
-                  style={[
-                    styles.progressFill, 
-                    { width: `${calculateProgress(selectedFund?.amount || '0', selectedFund?.targetAmount || '0')}%` }
-                  ]} 
-                />
+            <View style={styles.createdDateContainer}>
+              <View style={styles.dateItem}>
+                <FontAwesome5 name="calendar-plus" size={14} color="#6B7280" />
+                <Text style={styles.createdDateText}>
+                  Created: {selectedFund?.createdAt?.split(' - ')[0]}
+                </Text>
               </View>
-              <Text style={styles.progressText}>
-                {calculateProgress(selectedFund?.amount || '0', selectedFund?.targetAmount || '0').toFixed(1)}%
-              </Text>
+              <View style={styles.dateItem}>
+                <FontAwesome5 name="clock" size={14} color="#6B7280" />
+                <Text style={styles.createdDateText}>
+                  Time: {selectedFund?.createdAt?.split(' - ')[1]}
+                </Text>
+              </View>
+              {selectedFund?.modifiedAt && (
+                <>
+                  <View style={styles.dateItem}>
+                    <FontAwesome5 name="calendar-alt" size={14} color="#6B7280" />
+                    <Text style={styles.createdDateText}>
+                      Modified: {selectedFund?.modifiedAt.split(' - ')[0]}
+                    </Text>
+                  </View>
+                  <View style={styles.dateItem}>
+                    <FontAwesome5 name="clock" size={14} color="#6B7280" />
+                    <Text style={styles.createdDateText}>
+                      Time: {selectedFund?.modifiedAt.split(' - ')[1]}
+                    </Text>
+                  </View>
+                </>
+              )}
             </View>
+            <Text style={styles.fundBalanceLabel}>Fund Progress</Text>
+            <FundProgressBar 
+              progress={calculateProgress(selectedFund?.amount || '0', selectedFund?.targetAmount || '0')} 
+            />
             <View style={styles.amountContainer}>
               <View style={styles.amountBox}>
                 <Text style={styles.amountLabel}>Current Amount</Text>
@@ -391,55 +524,62 @@ const CoupleFundScreen: React.FC = () => {
               </View>
             </View>
             {isEditMode ? (
-              <>
-                <TextInput
-                  style={[styles.input, { marginTop: 10 }]}
-                  placeholder="Fund Title"
-                  value={editingFund.title}
-                  onChangeText={(text) => setEditingFund(prev => ({ ...prev, title: text }))}
-                />
-                <TextInput
-                  style={[styles.input, { height: 80 }]}
-                  placeholder="Description"
-                  value={editingFund.description}
-                  onChangeText={(text) => setEditingFund(prev => ({ ...prev, description: text }))}
-                  multiline
-                />
-                <TextInput
-                  style={styles.amountInput}
-                  placeholder="Current Amount"
-                  value={`${editingFund.currentAmount}`}
-                  onChangeText={(text) => handleAmountInput(text, 'current', setEditingFund)}
-                  keyboardType="numeric"
-                />
-                <TextInput
-                  style={styles.amountInput}
-                  placeholder="Target Amount"
-                  value={`${editingFund.targetAmount}`}
-                  onChangeText={(text) => handleAmountInput(text, 'target', setEditingFund)}
-                  keyboardType="numeric"
-                />
-                <View style={styles.editButtons}>
-                  <TouchableOpacity 
-                    style={[styles.editButton, { backgroundColor: '#9CA3AF' }]}
-                    onPress={() => {
-                      setIsEditMode(false);
-                      setEditingFund({ title: '', description: '', currentAmount: '', targetAmount: '' });
-                    }}
-                  >
-                    <Text style={styles.editButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.editButton}
-                    onPress={handleEditFund}
-                  >
-                    <Text style={styles.editButtonText}>Save</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <Text style={styles.fundDescription}>{selectedFund?.description}</Text>
-            )}
+  <>
+    <TextInput
+      style={[styles.input, { marginTop: 10 }]}
+      placeholder="Fund Title"
+      value={editingFund.title}
+      onChangeText={(text) => setEditingFund(prev => ({ ...prev, title: text }))}
+    />
+    <TextInput
+      style={[styles.input, { height: 80 }]}
+      placeholder="Description"
+      value={editingFund.description}
+      onChangeText={(text) => setEditingFund(prev => ({ ...prev, description: text }))}
+      multiline
+    />
+    
+    <View style={styles.amountInputContainer}>
+      <Text style={styles.amountInputLabel}>Current Amount</Text>
+      <TextInput
+        style={styles.amountInput}
+        value={editingFund.currentAmount}
+        onChangeText={(text) => handleAmountInput(text, 'current', setEditingFund)}
+        keyboardType="numeric"
+      />
+    </View>
+    
+    <View style={styles.amountInputContainer}>
+      <Text style={styles.amountInputLabel}>Target Amount</Text>
+      <TextInput
+        style={styles.amountInput}
+        value={editingFund.targetAmount}
+        onChangeText={(text) => handleAmountInput(text, 'target', setEditingFund)}
+        keyboardType="numeric"
+      />
+    </View>
+    
+    <View style={styles.editButtons}>
+      <TouchableOpacity 
+        style={[styles.editButton, { backgroundColor: '#9CA3AF' }]}
+        onPress={() => {
+          setIsEditMode(false);
+          setEditingFund({ title: '', description: '', currentAmount: '', targetAmount: '' });
+        }}
+      >
+        <Text style={styles.editButtonText}>Cancel</Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={styles.editButton}
+        onPress={handleEditFund}
+      >
+        <Text style={styles.editButtonText}>Save</Text>
+      </TouchableOpacity>
+    </View>
+  </>
+) : (
+  <Text style={styles.fundDescription}>{selectedFund?.description}</Text>
+)}
           </View>
 
           <View style={styles.actionSection}>
@@ -486,6 +626,7 @@ const CoupleFundScreen: React.FC = () => {
     </SafeAreaView>
   );
 
+  // Cập nhật renderFundList để thêm thanh tìm kiếm
   const renderFundList = () => (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -493,10 +634,51 @@ const CoupleFundScreen: React.FC = () => {
           <FontAwesome5 name="chevron-left" size={20} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Couple Fund</Text>
-        <TouchableOpacity accessibilityLabel="Search">
+        <TouchableOpacity 
+          accessibilityLabel="Search"
+          onPress={() => setIsSearchVisible(true)}
+        >
           <FontAwesome name="search" size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
+
+      {/* Thêm thanh tìm kiếm */}
+      {isSearchVisible && (
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputContainer}>
+            <FontAwesome name="search" size={16} color="#666666" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search funds..."
+              value={searchQuery}
+              onChangeText={handleSearch}
+              autoFocus
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSearchQuery('');
+                  handleSearch('');
+                }}
+                style={styles.clearButton}
+              >
+                <FontAwesome name="times-circle" size={16} color="#666666" />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => {
+              setIsSearchVisible(false);
+              setSearchQuery('');
+              handleSearch('');
+            }}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.main}>
         <View style={styles.fundCreationButtonContainer}>
@@ -520,7 +702,8 @@ const CoupleFundScreen: React.FC = () => {
         </View>
 
         <FlatList
-          data={funds}
+          ref={flatListRef}
+          data={filteredFunds} // Sử dụng filteredFunds thay vì funds
           renderItem={renderFundItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.cardList, dynamicStyles.listContainer]}
@@ -531,21 +714,154 @@ const CoupleFundScreen: React.FC = () => {
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={5}
+          onScrollEndDrag={(event) => {
+            setScrollPosition(event.nativeEvent.contentOffset.y);
+          }}
+          onMomentumScrollEnd={(event) => {
+            setScrollPosition(event.nativeEvent.contentOffset.y);
+          }}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {searchQuery.length > 0
+                  ? 'No funds found matching your search'
+                  : 'No funds available'}
+              </Text>
+            </View>
+          )}
           ListFooterComponent={<View style={{ height: 80 }} />}
         />
       </View>
     </SafeAreaView>
   );
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#EE1D52" />
-      </View>
-    );
-  }
+  // Thêm Modal vào phần render chính của component
+  const renderCreateFundModal = () => (
+    <Modal
+      visible={isModalVisible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setIsModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Create New Fund</Text>
+            <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+              <FontAwesome name="times" size={24} color="#666666" />
+            </TouchableOpacity>
+          </View>
 
-  return selectedFund ? renderFundDetail() : renderFundList();
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Fund Title"
+              value={newFund.title}
+              onChangeText={(text) => setNewFund(prev => ({ ...prev, title: text }))}
+            />
+            <TextInput
+              style={[styles.modalInput, { height: 80 }]}
+              placeholder="Description"
+              value={newFund.description}
+              onChangeText={(text) => setNewFund(prev => ({ ...prev, description: text }))}
+              multiline
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Current Amount"
+              value={newFund.currentAmount}
+              onChangeText={(text) => handleAmountInput(text, 'current', setNewFund)}
+              keyboardType="numeric"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Target Amount"
+              value={newFund.targetAmount}
+              onChangeText={(text) => handleAmountInput(text, 'target', setNewFund)}
+              keyboardType="numeric"
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: '#9CA3AF' }]}
+                onPress={() => {
+                  setNewFund({
+                    title: '',
+                    description: '',
+                    currentAmount: '',
+                    targetAmount: '',
+                  });
+                  setIsModalVisible(false);
+                }}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.modalButton}
+                onPress={handleCreateFund}
+              >
+                <Text style={styles.modalButtonText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Thêm vào phần return cuối component
+  return (
+    <>
+      {selectedFund ? renderFundDetail() : renderFundList()}
+      {renderCreateFundModal()}
+    </>
+  );
+};
+
+const FundProgressBar = ({ progress }: { progress: number }) => {
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const [displayedPercent, setDisplayedPercent] = useState('0.00');
+  
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: progress,
+      duration: 1000,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+    
+    // Cập nhật hiển thị phần trăm khi animation thay đổi
+    const listener = progressAnim.addListener(({ value }) => {
+      const formattedValue = value.toFixed(2);
+      setDisplayedPercent(formattedValue);
+    });
+    
+    return () => {
+      progressAnim.removeListener(listener);
+    };
+  }, [progress]);
+
+  const width = progressAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={styles.progressContainer}>
+      <View style={styles.progressBar}>
+        <Animated.View 
+          style={[
+            styles.progressFill, 
+            { width }
+          ]} 
+        />
+      </View>
+      <Text style={styles.progressText}>
+        {displayedPercent}%
+      </Text>
+    </View>
+  );
 };
 
 export default CoupleFundScreen;
