@@ -4,6 +4,16 @@ const { width } = Dimensions.get('window');
 const SCREEN_PADDING = 16;
 const CARD_WIDTH = width - (SCREEN_PADDING * 2);
 
+// Thêm constants cho màu sắc
+const COLORS = {
+  primary: '#EE1D52',
+  secondary: '#666666',
+  white: '#FFFFFF',
+  lightGray: '#F3F4F6',
+  icon: '#333333',
+  background: '#F3F4F6',
+};
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -13,7 +23,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#EC4899', // bg-pink-600
+    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingTop: 45,
@@ -47,7 +57,7 @@ export const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: 'hidden',
     elevation: 4,
-    shadowColor: '#EC4899',
+    shadowColor: COLORS.primary, // Thay đổi từ #EC4899
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -110,7 +120,7 @@ export const styles = StyleSheet.create({
   },
   cardAmount: {
     fontSize: 14,
-    color: '#EC4899',
+    color: COLORS.primary, // Thay đổi từ #EC4899
     fontWeight: '500',
   },
   avatarContainer: {
@@ -138,7 +148,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#EC4899', //
+    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingTop: 45,
@@ -244,7 +254,7 @@ export const styles = StyleSheet.create({
     width: 40, // Giảm kích thước
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F9A1B7', // Fallback for gradient
+    backgroundColor: '#FFE6EB', // Màu nhạt hơn của primary
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -255,7 +265,7 @@ export const styles = StyleSheet.create({
     gap: 8, // Giảm gap từ 12 xuống 8
   },
   fundButton: {
-    backgroundColor: '#F9A1B7', // bg-[#f9a1b7]
+    backgroundColor: '#FFE6EB', // Màu nhạt hơn của primary
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 16, // Giảm padding ngang
@@ -267,7 +277,7 @@ export const styles = StyleSheet.create({
   fundButtonText: {
     fontSize: 13, // Giảm font size
     fontWeight: '600',
-    color: '#F75A7C', // text-[#f75a7c]
+    color: COLORS.primary, // Thay đổi từ #F75A7C
   },
   buttonIcon: {
     marginRight: 8,
@@ -346,7 +356,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   modalButton: {
-    backgroundColor: '#EC4899',
+    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
     borderRadius: 4,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -364,7 +374,7 @@ export const styles = StyleSheet.create({
   },
   editButton: {
     flex: 1,
-    backgroundColor: '#EC4899',
+    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -388,7 +398,7 @@ export const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#EC4899',
+    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
     borderRadius: 4,
     // React Native doesn't support CSS transitions
     // Use Animated API instead for animations
@@ -396,7 +406,7 @@ export const styles = StyleSheet.create({
   progressText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#EC4899',
+    color: COLORS.primary, // Thay đổi từ #EC4899
     textAlign: 'right',
     marginTop: 8,
   },
@@ -440,7 +450,7 @@ export const styles = StyleSheet.create({
   },
   deleteButton: {
     marginTop: 20,
-    backgroundColor: '#EC4899',
+    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

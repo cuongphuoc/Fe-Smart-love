@@ -338,14 +338,7 @@ const CoupleFundScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingBottom: 120, // Thêm padding bottom để tránh bị che khuất
-        }}
-      >
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: selectedFund?.image }}
@@ -364,7 +357,7 @@ const CoupleFundScreen: React.FC = () => {
               style={styles.changePhotoGradient}
             >
               <View style={styles.changePhotoIconContainer}>
-                <FontAwesome5 name="camera" size={14} color="#EC4899" />
+                <FontAwesome5 name="camera" size={14} color="#EE1D52" />
               </View>
               <Text style={styles.changePhotoText}>Change photo</Text>
             </LinearGradient>
@@ -451,41 +444,30 @@ const CoupleFundScreen: React.FC = () => {
 
           <View style={styles.actionSection}>
             <View style={styles.iconCircle}>
-              <FontAwesome5 name="dollar-sign" size={18} color="#FFFFFF" />
+              <FontAwesome5 name="dollar-sign" size={20} color="#EE1D52" />
             </View>
-            <View style={styles.actionButtons}>
-              <TouchableOpacity 
-                style={styles.fundButton}
-                activeOpacity={0.7}
-              >
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.fundButton}>
                 <Text style={styles.fundButtonText}>+ Fund</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.fundButton}
-                activeOpacity={0.7}
-              >
-                <FontAwesome5 
-                  name="credit-card" 
-                  size={12} 
-                  color="#F75A7C" 
-                  style={styles.buttonIcon} 
-                />
-                <Text style={styles.fundButtonText}>Withdraw</Text>
+              <TouchableOpacity style={styles.fundButton}>
+                <FontAwesome5 name="credit-card" size={14} color="#EE1D52" style={styles.buttonIcon} />
+                <Text style={styles.fundButtonText}>Withdraw funds</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.optionsSection}>
             <View style={styles.optionItem}>
-              <FontAwesome5 name="hand-peace" size={18} color="#E6003F" />
+              <FontAwesome5 name="hand-peace" size={18} color="#EE1D52" />
               <Text style={styles.optionText}>Reminder to{'\n'}contribute</Text>
             </View>
             <View style={styles.optionItem}>
-              <FontAwesome5 name="qrcode" size={18} color="#E6003F" />
+              <FontAwesome5 name="qrcode" size={18} color="#EE1D52" />
               <Text style={styles.optionText}>QR fundraiser</Text>
             </View>
             <View style={styles.optionItem}>
-              <FontAwesome5 name="money-bill-wave" size={18} color="#E6003F" />
+              <FontAwesome5 name="money-bill-wave" size={18} color="#EE1D52" />
               <Text style={styles.optionText}>Payment,{'\n'}money transfer</Text>
             </View>
           </View>
@@ -524,7 +506,7 @@ const CoupleFundScreen: React.FC = () => {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={['#F9A1B7', '#EC4899']}
+              colors={['#FFE6EB', '#EE1D52']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -558,7 +540,7 @@ const CoupleFundScreen: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#EC4899" />
+        <ActivityIndicator size="large" color="#EE1D52" />
       </View>
     );
   }
