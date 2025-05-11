@@ -13,11 +13,13 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
-  Easing
+  Easing,
+  Platform
 } from 'react-native';
 import { FontAwesome5, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { styles } from '../../assets/styles/CoupleFundStyle';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -185,6 +187,7 @@ const CoupleFundScreen: React.FC = () => {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredFunds, setFilteredFunds] = useState<Fund[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     loadFundsData();
@@ -420,7 +423,52 @@ const handleCreateFund = async () => {
     </TouchableOpacity>
   );
 
-  // Sửa lại trong renderFundDetail
+  // Thêm hàm xử lý chọn ảnh
+  const handleImagePick = async () => {
+    try {
+      // Yêu cầu quyền truy cập thư viện ảnh
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant permission to access your photo library');
+        return;
+      }
+
+      // Mở image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const newImageUri = result.assets[0].uri;
+        setSelectedImage(newImageUri);
+        
+        // Cập nhật ảnh trong selectedFund
+        if (selectedFund) {
+          const updatedFund = {
+            ...selectedFund,
+            image: newImageUri
+          };
+          setSelectedFund(updatedFund);
+          
+          // Cập nhật trong danh sách funds
+          const updatedFunds = funds.map(fund => 
+            fund.id === selectedFund.id ? updatedFund : fund
+          );
+          setFunds(updatedFunds);
+          await saveFundsData(updatedFunds);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  // Cập nhật phần renderFundDetail để sử dụng ảnh đã chọn
   const renderFundDetail = () => (
     <SafeAreaView style={styles.detailContainer}>
       <View style={styles.detailHeader}>
@@ -454,7 +502,7 @@ const handleCreateFund = async () => {
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: selectedFund?.image }}
+            source={{ uri: selectedImage || selectedFund?.image }}
             style={styles.backgroundImage}
             accessibilityLabel={selectedFund?.altImage}
           />
@@ -462,6 +510,7 @@ const handleCreateFund = async () => {
             style={styles.changePhotoButton}
             activeOpacity={0.8}
             accessibilityLabel="Change photo"
+            onPress={handleImagePick}
           >
             <LinearGradient
               colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}
