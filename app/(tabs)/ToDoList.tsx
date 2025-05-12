@@ -389,8 +389,8 @@ const TodoListScreen = () => {
     setIsSearchVisible(true);
   };
 
-  // Function: Clear search
-  const handleClearSearch = () => {
+  // Function: Close search
+  const handleCloseSearch = () => {
     setSearchQuery('');
     setSearchDate(null);
     setIsSearchVisible(false);
@@ -515,8 +515,8 @@ const TodoListScreen = () => {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.clearSearchButton} onPress={handleClearSearch}>
-            <Text style={styles.clearSearchText}>Clear</Text>
+          <TouchableOpacity style={styles.closeSearchButton} onPress={handleCloseSearch}>
+            <Text style={styles.closeSearchText}>Close</Text>
           </TouchableOpacity>
         </View>
       )}

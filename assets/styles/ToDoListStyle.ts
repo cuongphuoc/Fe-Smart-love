@@ -394,12 +394,12 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  clearSearchButton: {
+  closeSearchButton: {
     alignSelf: 'flex-end',
     marginTop: 10,
     padding: 5,
   },
-  clearSearchText: {
+  closeSearchText: {
     color: '#f03a6c',
     fontSize: 14,
     fontWeight: '500',
