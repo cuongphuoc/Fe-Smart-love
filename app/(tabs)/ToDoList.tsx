@@ -271,6 +271,11 @@ const TodoListScreen = () => {
   // Effect: Perform search when query, date, or mode changes
   useEffect(() => {
     performSearch();
+    // Update tab based on search results
+    if (searchResults.length > 0) {
+      const firstTask = searchResults[0];
+      setActiveTab(firstTask.completed ? 'done' : 'ongoing');
+    }
   }, [searchQuery, searchDate, searchMode, isSearchVisible, taskList]);
 
   // Function: Handle search query change
