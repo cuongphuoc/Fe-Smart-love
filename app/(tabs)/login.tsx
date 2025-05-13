@@ -10,8 +10,8 @@ import {
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useRouter } from 'expo-router';
 
-const router = useRouter();
 const SignInScreen = ({ navigation }:any) => {
+  const router = useRouter();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');

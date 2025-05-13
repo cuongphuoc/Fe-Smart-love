@@ -1,4 +1,8 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions, Platform, StatusBar } from 'react-native';
+
+// Get screen dimensions
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isSmallDevice = SCREEN_WIDTH < 375;
 
 export const styles = StyleSheet.create({
   screenContainer: {
@@ -10,15 +14,21 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#f03a6c',
-    paddingVertical: 15,
+    paddingVertical: isSmallDevice ? 12 : 15,
     paddingHorizontal: 15,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    paddingTop: Platform.OS === 'android' ? 10 : isSmallDevice ? 12 : 15,
   },
   backButton: {
     padding: 5,
   },
   headerTitle: {
     color: 'white',
-    fontSize: 24,
+    fontSize: isSmallDevice ? 20 : 24,
     fontWeight: '500',
   },
   searchButton: {
@@ -26,6 +36,7 @@ export const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
+    paddingBottom: 80, // Space for the floating action button
   },
   monthSelectorContainer: {
     flexDirection: 'row',
@@ -39,17 +50,26 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   monthTitleText: {
-    fontSize: 22,
+    fontSize: isSmallDevice ? 18 : 22,
     fontWeight: '500',
     marginRight: 5,
   },
   todayLabel: {
-    fontSize: 18,
+    fontSize: isSmallDevice ? 16 : 18,
     color: '#f03a6c',
     fontWeight: '500',
   },
   calendarContainer: {
     padding: 10,
+    backgroundColor: 'white',
+    marginHorizontal: 10,
+    marginVertical: 10,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   calendarHeader: {
     flexDirection: 'row',
@@ -63,7 +83,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   calendarMonthYear: {
-    fontSize: 18,
+    fontSize: isSmallDevice ? 16 : 18,
     color: '#f03a6c',
     fontWeight: '500',
   },
@@ -76,6 +96,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#f03a6c',
     fontWeight: '500',
+    fontSize: isSmallDevice ? 12 : 14,
   },
   weekRow: {
     flexDirection: 'row',
@@ -87,12 +108,13 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 5,
+    minHeight: isSmallDevice ? 30 : 35,
   },
   calendarDayLabel: {
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
   },
   calendarDateLabel: {
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
     color: '#666',
   },
   currentDateLabel: {
@@ -100,10 +122,13 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   selectedDay: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#ffebf0',
+    borderWidth: 1,
+    borderColor: '#f03a6c',
   },
   selectedDayText: {
     fontWeight: '700',
+    color: '#f03a6c',
   },
   otherMonthDay: {
     opacity: 0.5,
@@ -122,18 +147,45 @@ export const styles = StyleSheet.create({
     paddingTop: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    backgroundColor: 'white',
+    marginHorizontal: 10,
+    marginVertical: 5,
+    borderRadius: 10,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   taskSectionTitle: {
-    fontSize: 18,
+    fontSize: isSmallDevice ? 16 : 18,
     fontWeight: '500',
     paddingHorizontal: 20,
     marginBottom: 15,
+    color: '#333',
   },
   taskContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
+    paddingVertical: isSmallDevice ? 12 : 15,
     paddingHorizontal: 20,
+  },
+  taskTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    paddingRight: 5,
+  },
+  taskTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  taskTimeText: {
+    fontSize: 12,
+    color: '#888',
+    marginLeft: 4,
   },
   taskCheckbox: {
     width: 24,
@@ -149,17 +201,21 @@ export const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: 'transparent',
+    backgroundColor: 'white',
   },
   taskCheckboxCompleted: {
     backgroundColor: '#f03a6c',
+    borderColor: '#f03a6c',
   },
   taskDescription: {
     flex: 1,
-    fontSize: 18,
+    fontSize: isSmallDevice ? 16 : 18,
+    color: '#333',
+    flexWrap: 'wrap',
   },
   taskOptionsButton: {
-    padding: 5,
+    padding: 8,
+    borderRadius: 15,
   },
   taskOptionsIcon: {
     fontSize: 20,
@@ -169,6 +225,7 @@ export const styles = StyleSheet.create({
   separator: {
     height: 1,
     backgroundColor: '#e0e0e0',
+    marginHorizontal: 20,
   },
   addTaskButton: {
     position: 'absolute',
@@ -185,10 +242,13 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
+    zIndex: 999,
   },
   addTaskButtonText: {
     fontSize: 30,
     color: 'white',
+    lineHeight: Platform.OS === 'ios' ? 58 : 60,
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -201,9 +261,14 @@ export const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    maxHeight: SCREEN_HEIGHT * 0.8,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: isSmallDevice ? 18 : 20,
     fontWeight: '600',
     color: '#333',
     marginBottom: 20,
@@ -214,7 +279,7 @@ export const styles = StyleSheet.create({
     borderRadius: 5,
     padding: 10,
     marginBottom: 15,
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
   },
   datePickerButton: {
     borderWidth: 1,
@@ -224,7 +289,7 @@ export const styles = StyleSheet.create({
     marginBottom: 15,
   },
   datePickerText: {
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
     color: '#333',
   },
   modalButtonContainer: {
@@ -233,7 +298,7 @@ export const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    padding: 10,
+    padding: isSmallDevice ? 8 : 10,
     borderRadius: 5,
     alignItems: 'center',
     marginHorizontal: 5,
@@ -246,26 +311,39 @@ export const styles = StyleSheet.create({
   },
   modalButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
     fontWeight: '500',
   },
   tabContainer: {
     flexDirection: 'row',
-    borderBottomWidth: 0,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  tab: {
+  tabButton: {
     flex: 1,
     paddingVertical: 15,
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  activeTab: {
-    backgroundColor: '#f03a6c',
+  activeTabButton: {
+    borderBottomColor: '#f03a6c',
   },
-  tabText: {
+  tabButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: 'white',
+    color: '#666',
+  },
+  activeTabButtonText: {
+    color: '#f03a6c',
+    fontWeight: '600',
   },
   selectedDateContainer: {
     backgroundColor: '#f03a6c',
@@ -274,11 +352,11 @@ export const styles = StyleSheet.create({
   },
   selectedYear: {
     color: 'white',
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
   },
   selectedDayMonth: {
     color: 'white',
-    fontSize: 20,
+    fontSize: isSmallDevice ? 18 : 20,
     fontWeight: '500',
   },
   contextMenuOverlay: {
@@ -288,20 +366,21 @@ export const styles = StyleSheet.create({
   contextMenuContainer: {
     position: 'absolute',
     backgroundColor: 'white',
-    borderRadius: 5,
+    borderRadius: 8,
     padding: 5,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
+    minWidth: 120,
   },
   contextMenuItem: {
     paddingVertical: 10,
     paddingHorizontal: 15,
   },
   contextMenuItemText: {
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -319,24 +398,28 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    padding: 12,
+    padding: isSmallDevice ? 8 : 10,
+    paddingRight: isSmallDevice ? 5 : 8,
     borderRadius: 8,
     marginHorizontal: 5,
     borderWidth: 1,
     borderColor: '#f03a6c',
+    minHeight: 50,
   },
   dateTimeText: {
     marginLeft: 8,
-    fontSize: 16,
+    fontSize: isSmallDevice ? 12 : 14,
     color: '#f03a6c',
     fontWeight: '500',
+    flex: 1,
+    flexWrap: 'wrap',
   },
   taskInput: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
     marginBottom: 20,
   },
   searchContainer: {
@@ -344,6 +427,11 @@ export const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   searchModeContainer: {
     flexDirection: 'row',
@@ -361,7 +449,7 @@ export const styles = StyleSheet.create({
     borderBottomColor: '#f03a6c',
   },
   searchModeText: {
-    fontSize: 14,
+    fontSize: isSmallDevice ? 12 : 14,
     color: '#666',
   },
   activeSearchModeText: {
@@ -379,7 +467,7 @@ export const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
     color: '#333',
   },
   dateSearchButton: {
@@ -388,11 +476,15 @@ export const styles = StyleSheet.create({
     backgroundColor: '#f8f8f8',
     borderRadius: 8,
     padding: 12,
+    paddingRight: 8,
+    minHeight: 50,
   },
   dateSearchText: {
     marginLeft: 8,
-    fontSize: 16,
+    fontSize: isSmallDevice ? 12 : 14,
     color: '#333',
+    flex: 1,
+    flexWrap: 'wrap',
   },
   closeSearchButton: {
     alignSelf: 'flex-end',
@@ -401,13 +493,68 @@ export const styles = StyleSheet.create({
   },
   closeSearchText: {
     color: '#f03a6c',
-    fontSize: 14,
+    fontSize: isSmallDevice ? 12 : 14,
     fontWeight: '500',
   },
   emptyListText: {
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: isSmallDevice ? 14 : 16,
     color: '#666',
     marginTop: 20,
+    paddingVertical: 20,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 5,
+    marginLeft: 10,
+  },
+  taskCheckboxSelected: {
+    backgroundColor: '#f03a6c',
+    borderColor: '#f03a6c',
+  },
+  taskStatusIndicator: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  completedTaskText: {
+    textDecorationLine: 'line-through',
+    color: '#888888',
+  },
+  taskSectionHeader: {
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    marginTop: 10,
+  },
+  taskSectionHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#444',
+  },
+  completedTaskSection: {
+    opacity: 0.8,
+    backgroundColor: '#f9f9f9',
+  },
+  taskDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  taskDateText: {
+    fontSize: 12,
+    color: '#888',
+    marginLeft: 4,
+    flexShrink: 1,
+    flexWrap: 'wrap',
+    width: '90%',
   },
 });

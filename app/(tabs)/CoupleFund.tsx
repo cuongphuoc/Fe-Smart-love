@@ -470,7 +470,7 @@ const CoupleFundScreen: React.FC = () => {
 
   const renderFundDetail = () => (
     <SafeAreaView style={styles.detailContainer}>
-      <View style={styles.detailHeader}>
+      <View style={[styles.detailHeader, { paddingTop: insets.top || 12 }]}>
         <TouchableOpacity
           accessibilityLabel="Back"
           onPress={() => setSelectedFund(null)}
@@ -643,7 +643,7 @@ const CoupleFundScreen: React.FC = () => {
 
   const renderFundList = () => (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top || 12 }]}>
         <TouchableOpacity accessibilityLabel="Back">
           <FontAwesome5 name="chevron-left" size={20} color="#FFFFFF" />
         </TouchableOpacity>

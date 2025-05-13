@@ -1,4 +1,4 @@
-import { StyleSheet, Dimensions, ViewStyle } from 'react-native';
+import { StyleSheet, Dimensions, ViewStyle, Platform, StatusBar } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const SCREEN_PADDING = 16;
@@ -6,7 +6,7 @@ const CARD_WIDTH = width - (SCREEN_PADDING * 2);
 
 // Thêm constants cho màu sắc
 const COLORS = {
-  primary: '#EE1D52',
+  primary: '#f03a6c',
   secondary: '#666666',
   white: '#FFFFFF',
   lightGray: '#F3F4F6',
@@ -21,7 +21,7 @@ const commonHeaderStyles: ViewStyle = {
   backgroundColor: COLORS.primary,
   paddingHorizontal: 16,
   paddingVertical: 12,
-  paddingTop: 45,
+  paddingTop: Platform.OS === 'android' ? 12 : 12,
   elevation: 4,
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
