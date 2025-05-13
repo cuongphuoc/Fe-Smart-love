@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { styles } from '../../assets/styles/CoupleFundStyle';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Font from 'expo-font';
 
 // Constants
 const STORAGE_KEY = 'couple_funds_data';
@@ -122,6 +123,21 @@ const FundProgressBar = ({ progress }: { progress: number }) => {
 };
 
 const CoupleFundScreen: React.FC = () => {
+  // Add font loading state
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  // Load fonts
+  useEffect(() => {
+    async function loadFonts() {
+      await Font.loadAsync({
+        ...FontAwesome.font,
+        ...FontAwesome5.font,
+      });
+      setFontsLoaded(true);
+    }
+    loadFonts();
+  }, []);
+
   // State
   const [funds, setFunds] = useState<Fund[]>([]);
   const [selectedFund, setSelectedFund] = useState<Fund | null>(null);
@@ -772,7 +788,7 @@ const CoupleFundScreen: React.FC = () => {
     </Modal>
   );
 
-  if (isLoading) {
+  if (!fontsLoaded || isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#EE1D52" />
