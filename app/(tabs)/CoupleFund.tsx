@@ -94,16 +94,39 @@ const formatDateTime = (date: Date): string => {
 // Components
 const FundProgressBar = ({ progress }: { progress: number }) => {
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const percentAnim = useRef(new Animated.Value(0)).current;
   const [displayedPercent, setDisplayedPercent] = useState('0.00');
   
   useEffect(() => {
-    Animated.timing(progressAnim, {
-      toValue: progress,
-      duration: 1000,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: false,
-    }).start();
-    setDisplayedPercent(progress.toFixed(2));
+    Animated.parallel([
+      Animated.timing(progressAnim, {
+        toValue: progress,
+        duration: 1000,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }),
+      Animated.timing(percentAnim, {
+        toValue: progress,
+        duration: 1000,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      })
+    ]).start();
+    
+    // Update displayed percentage based on animation
+    percentAnim.addListener(({ value }) => {
+      setDisplayedPercent(value.toFixed(2));
+    });
+    
+    // Set final value after animation
+    setTimeout(() => {
+      setDisplayedPercent(progress.toFixed(2));
+      percentAnim.removeAllListeners();
+    }, 1100);
+    
+    return () => {
+      percentAnim.removeAllListeners();
+    };
   }, [progress]);
 
   const width = progressAnim.interpolate({
@@ -663,7 +686,7 @@ const CoupleFundScreen: React.FC = () => {
         <TouchableOpacity accessibilityLabel="Back">
           <FontAwesome5 name="chevron-left" size={20} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Couple Fund</Text>
+        <Text style={styles.headerTitle}>Couple fund</Text>
         <TouchableOpacity 
           accessibilityLabel="Search"
           onPress={() => setIsSearchVisible(true)}

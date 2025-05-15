@@ -502,7 +502,7 @@ const TodoListScreen = () => {
         <TouchableOpacity style={styles.backButton}>
           <Ionicons name="chevron-back" size={28} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>To-Do List</Text>
+        <Text style={styles.headerTitle}>To do list</Text>
         <View style={styles.headerButtons}>
           {isSelectionMode ? (
             <>
