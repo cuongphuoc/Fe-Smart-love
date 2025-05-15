@@ -120,10 +120,20 @@ export const styles = StyleSheet.create({
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
   },
+  amountContainerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   cardAmount: {
     fontSize: 14,
-    color: COLORS.primary, // Thay đổi từ #EC4899
+    color: COLORS.primary,
     fontWeight: '500',
+  },
+  cardTargetAmount: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '400',
+    marginLeft: 4,
   },
   avatarContainer: {
     flexDirection: 'row',
@@ -590,5 +600,43 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Celebration styles
+  celebrationContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFF9E6',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFDF00',
+  },
+  celebrationText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  celebrateAgainButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  celebrateAgainText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  confettiOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+    zIndex: 1000,
   },
 });

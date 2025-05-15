@@ -25,10 +25,12 @@ export default function TabLayout() {
 
   const screens = [
     { name: "index", title: "Home", icon: "house.fill" },
-    { name: "explore", title: "Explore", icon: "paperplane.fill" },
-    { name: "profile", title: "Profile", icon: "person.fill" },
-    { name: "CalendarScreen", title: "CalendarScreen", icon: "person.fill" },
-    { name: "login", title: "Login", icon: "person.fill" },
+    { name: "viewdiary", title: "Diary", icon: "book.fill" },
+    { name: "postdiary", title: "Write", icon: "pencil.line" },
+    { name: "CalendarScreen", title: "Calendar", icon: "calendar.badge.clock" },
+    { name: "CoupleFund", title: "Fund", icon: "creditcard.fill" },
+    { name: "ToDoList", title: "To-Do", icon: "checkmark.circle.fill" },
+    { name: "login", title: "Login", icon: "lock.fill" },
   ];
 
   console.log("All tabs:", screens.map(screen => screen.name));
@@ -64,41 +66,42 @@ export default function TabLayout() {
         <Tabs.Screen
           name="viewdiary"
           options={{
-            title: 'viewdiary',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+            title: 'Diary',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
           }}
         />
         <Tabs.Screen
           name="postdiary"
           options={{
-            title: 'postdiary',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+            title: 'Write',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="pencil.line" color={color} />,
           }}
         />
         <Tabs.Screen
           name="CalendarScreen"
           options={{
-            title: 'CalendarScreen',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+            title: 'Calendar',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar.badge.clock" color={color} />,
           }}
         />
         <Tabs.Screen
           name="login"
           options={{
-            title: 'login',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+            title: 'Login',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="lock.fill" color={color} />,
           }}
         />
         <Tabs.Screen
           name="CoupleFund"
           options={{
-            title: 'CoupleFund',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+            title: 'Fund',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="creditcard.fill" color={color} />,
           }}
-        />        <Tabs.Screen
+        />
+        <Tabs.Screen
           name="ToDoList"
           options={{
-            title: 'To-Do List',
+            title: 'To-Do',
             tabBarIcon: ({ color }) => <IconSymbol size={28} name="checkmark.circle.fill" color={color} />,
           }}
         />

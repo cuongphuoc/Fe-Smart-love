@@ -42,6 +42,7 @@
     "react-native": "^0.76.9",
     "react-native-calendars": "^1.1310.0",
     "react-native-check-box": "^2.1.7",
+    "react-native-confetti-cannon": "^1.5.2",
     "react-native-date-picker": "^5.0.10",
     "react-native-gesture-handler": "~2.20.2",
     "react-native-haptic-feedback": "^2.3.3",
@@ -52,7 +53,8 @@
     "react-native-svg": "^15.8.0",
     "react-native-vector-icons": "^10.2.0",
     "react-native-web": "~0.19.13",
-    "react-native-webview": "^13.12.5"
+    "react-native-webview": "^13.12.5",
+    "expo-notifications": "~0.29.14"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

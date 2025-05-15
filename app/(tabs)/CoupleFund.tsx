@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Dimensions,
 } from 'react-native';
 import { FontAwesome5, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,10 +22,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { styles } from '../../assets/styles/CoupleFundStyle';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Font from 'expo-font';
+import ConfettiCannon from 'react-native-confetti-cannon';
+import { registerForPushNotificationsAsync, sendFundCompletionNotification } from '../../utils/notifications';
 
 // Constants
 const STORAGE_KEY = 'couple_funds_data';
 const MAX_FUNDS = 10;
+const { width } = Dimensions.get('window');
 
 // Types
 interface Fund {
@@ -188,6 +192,11 @@ const CoupleFundScreen: React.FC = () => {
     targetAmount: '',
   });
 
+  const [showCelebration, setShowCelebration] = useState(false);
+  const confettiRef = useRef<ConfettiCannon>(null);
+  const [notificationsPermission, setNotificationsPermission] = useState(false);
+  const [notifiedFunds, setNotifiedFunds] = useState<string[]>([]);
+
   // Effects
   useEffect(() => {
     loadFundsData();
@@ -196,6 +205,68 @@ const CoupleFundScreen: React.FC = () => {
   useEffect(() => {
     setFilteredFunds(funds);
   }, [funds]);
+
+  useEffect(() => {
+    if (selectedFund) {
+      const progress = calculateProgress(selectedFund.amount, selectedFund.targetAmount);
+      if (progress >= 100 && !showCelebration) {
+        setShowCelebration(true);
+        setTimeout(() => {
+          confettiRef.current?.start();
+        }, 500);
+      } else if (progress < 100) {
+        setShowCelebration(false);
+      }
+    }
+  }, [selectedFund]);
+
+  // Request notifications permission on mount
+  useEffect(() => {
+    const setupNotifications = async () => {
+      const token = await registerForPushNotificationsAsync();
+      setNotificationsPermission(!!token);
+
+      // Load notified funds from storage
+      try {
+        const storedNotifiedFunds = await AsyncStorage.getItem('notified_funds');
+        if (storedNotifiedFunds) {
+          setNotifiedFunds(JSON.parse(storedNotifiedFunds));
+        }
+      } catch (error) {
+        console.error('Error loading notified funds:', error);
+      }
+    };
+    
+    setupNotifications();
+  }, []);
+  
+  // Check for fund completion and trigger notification
+  useEffect(() => {
+    const checkFundsCompletion = async () => {
+      if (!notificationsPermission) return;
+      
+      const completedFunds = funds.filter(fund => {
+        const progress = calculateProgress(fund.amount, fund.targetAmount);
+        return progress >= 100 && !notifiedFunds.includes(fund.id);
+      });
+      
+      if (completedFunds.length > 0) {
+        const newNotifiedFunds = [...notifiedFunds];
+        
+        for (const fund of completedFunds) {
+          // Send notification for each newly completed fund
+          await sendFundCompletionNotification(fund.title);
+          newNotifiedFunds.push(fund.id);
+        }
+        
+        // Save the updated list of notified funds
+        setNotifiedFunds(newNotifiedFunds);
+        await AsyncStorage.setItem('notified_funds', JSON.stringify(newNotifiedFunds));
+      }
+    };
+    
+    checkFundsCompletion();
+  }, [funds, notificationsPermission, notifiedFunds]);
 
   // Handlers
   const loadFundsData = async () => {
@@ -368,6 +439,15 @@ const CoupleFundScreen: React.FC = () => {
     await saveFundsData(updatedFunds);
     setSelectedFund(updatedFund);
     setIsEditMode(false);
+    
+    // Check if fund was just completed
+    const progress = calculateProgress(formattedCurrentAmount, formattedTargetAmount);
+    if (progress >= 100 && notificationsPermission && !notifiedFunds.includes(updatedFund.id)) {
+      await sendFundCompletionNotification(updatedFund.title);
+      const newNotifiedFunds = [...notifiedFunds, updatedFund.id];
+      setNotifiedFunds(newNotifiedFunds);
+      await AsyncStorage.setItem('notified_funds', JSON.stringify(newNotifiedFunds));
+    }
   };
 
   const handleDeleteFund = async () => {
@@ -393,6 +473,11 @@ const CoupleFundScreen: React.FC = () => {
     );
   };
 
+  // Function to explode confetti manually for completed funds
+  const triggerCelebration = () => {
+    confettiRef.current?.start();
+  };
+
   // Render functions
   const renderFundItem = ({ item }: { item: Fund }) => (
     <TouchableOpacity
@@ -409,7 +494,10 @@ const CoupleFundScreen: React.FC = () => {
         <Text style={styles.cardDate}>{item.createdAt}</Text>
       </View>
       <View style={styles.cardFooter}>
-        <Text style={styles.cardAmount}>{item.amount}</Text>
+        <View style={styles.amountContainerCard}>
+          <Text style={styles.cardAmount}>{item.amount}</Text>
+          <Text style={styles.cardTargetAmount}>/{item.targetAmount}</Text>
+        </View>
         <View style={styles.avatarContainer}>
           {item.avatars.map((avatar, index) => (
             <Image
@@ -600,6 +688,17 @@ const CoupleFundScreen: React.FC = () => {
             <FundProgressBar 
               progress={calculateProgress(selectedFund?.amount || '0', selectedFund?.targetAmount || '0')} 
             />
+            {showCelebration && (
+              <View style={styles.celebrationContainer}>
+                <Text style={styles.celebrationText}>🎉 Congratulations! Fund completed! 🎉</Text>
+                <TouchableOpacity 
+                  style={styles.celebrateAgainButton} 
+                  onPress={triggerCelebration}
+                >
+                  <Text style={styles.celebrateAgainText}>Celebrate Again!</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <View style={styles.amountContainer}>
               <View style={styles.amountBox}>
                 <Text style={styles.amountLabel}>Current Amount</Text>
@@ -636,7 +735,7 @@ const CoupleFundScreen: React.FC = () => {
             )}
           </View>
 
-          <View style={styles.actionSection}>
+          {/* <View style={styles.actionSection}>
             <View style={styles.iconCircle}>
               <FontAwesome5 name="dollar-sign" size={20} color="#EE1D52" />
             </View>
@@ -649,7 +748,7 @@ const CoupleFundScreen: React.FC = () => {
                 <Text style={styles.fundButtonText}>Withdraw funds</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </View> */}
 
           <View style={styles.optionsSection}>
             <View style={styles.optionItem}>
@@ -677,6 +776,22 @@ const CoupleFundScreen: React.FC = () => {
           )}
         </View>
       </ScrollView>
+      
+      {/* Confetti overlay that will display on top */}
+      {showCelebration && (
+        <View style={styles.confettiOverlay}>
+          <ConfettiCannon
+            ref={confettiRef}
+            count={200}
+            origin={{x: width / 2, y: 0}}
+            autoStart={false}
+            fadeOut
+            explosionSpeed={350}
+            fallSpeed={3000}
+            colors={['#EE1D52', '#FFDF00', '#5EFCE8', '#736EFE', '#EC4899']}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 
