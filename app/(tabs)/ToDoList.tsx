@@ -20,7 +20,6 @@ import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { styles } from '../../assets/styles/ToDoListStyle';
-import { sendTaskCompletionNotification, registerForPushNotificationsAsync } from '../../utils/notifications';
 
 // STORAGE KEY
 const STORAGE_KEY = '@todo_list_data';
@@ -138,19 +137,6 @@ const TodoListScreen = () => {
   // Constants
   const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const insets = useSafeAreaInsets();
-
-  // Effect: Request notification permissions on component mount
-  useEffect(() => {
-    const requestNotificationPermissions = async () => {
-      try {
-        await registerForPushNotificationsAsync();
-      } catch (error) {
-        console.error('Error requesting notification permissions:', error);
-      }
-    };
-    
-    requestNotificationPermissions();
-  }, []);
 
   // Effect: Load data from AsyncStorage
   useEffect(() => {
@@ -413,20 +399,7 @@ const TodoListScreen = () => {
   };
 
   // Hàm: Toggle trạng thái hoàn thành
-  const handleToggleTaskComplete = async (id: string) => {
-    // Save the task title before toggling the completion status
-    let taskTitle = '';
-    
-    // Find the task in the taskList to get its title
-    taskList.forEach(section => {
-      section.tasks.forEach(task => {
-        if (task.id === id && !task.completed) {
-          taskTitle = task.title;
-        }
-      });
-    });
-    
-    // Update the task in state
+  const handleToggleTaskComplete = (id: string) => {
     setTaskList((prev) =>
       prev.map((section) => ({
         ...section,
@@ -435,15 +408,6 @@ const TodoListScreen = () => {
         ),
       }))
     );
-    
-    // If the task is being marked as completed, send a notification
-    if (taskTitle) {
-      try {
-        await sendTaskCompletionNotification(taskTitle);
-      } catch (error) {
-        console.error('Error sending notification:', error);
-      }
-    }
   };
 
   // Hàm: Xử lý nhấn nút tùy chọn
@@ -538,7 +502,7 @@ const TodoListScreen = () => {
         <TouchableOpacity style={styles.backButton}>
           <Ionicons name="chevron-back" size={28} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>To do list</Text>
+        <Text style={styles.headerTitle}>To-Do List</Text>
         <View style={styles.headerButtons}>
           {isSelectionMode ? (
             <>
@@ -728,9 +692,7 @@ const TodoListScreen = () => {
                         
                         return (
                           <View key={`all-${section.date}`} style={styles.taskSectionContainer}>
-                            <Text style={[styles.taskSectionTitle, { color: '#f03a6c' }]}>
-                              {section.date}
-                            </Text>
+                            <Text style={styles.taskSectionTitle}>{formatDate(new Date(section.date))}</Text>
                             <FlatList
                               data={section.tasks}
                               keyExtractor={(item) => item.id}
@@ -753,18 +715,14 @@ const TodoListScreen = () => {
                     ) : activeTab === 'ongoing' ? (
                       // Tab "On going"
                       taskList.map((section) => {
-                        if (section.tasks.length === 0) return null;
-                        
-                        const ongoingTasks = section.tasks.filter(task => !task.completed);
-                        if (ongoingTasks.length === 0) return null;
+                        const pendingTasks = section.tasks.filter(task => !task.completed);
+                        if (pendingTasks.length === 0) return null;
                         
                         return (
-                          <View key={`ongoing-${section.date}`} style={styles.taskSectionContainer}>
-                            <Text style={[styles.taskSectionTitle, { color: '#f03a6c' }]}>
-                              {section.date}
-                            </Text>
+                          <View key={`pending-${section.date}`} style={styles.taskSectionContainer}>
+                            <Text style={styles.taskSectionTitle}>{formatDate(new Date(section.date))}</Text>
                             <FlatList
-                              data={ongoingTasks}
+                              data={pendingTasks}
                               keyExtractor={(item) => item.id}
                               renderItem={({ item }) => (
                                 <TaskItem
@@ -785,18 +743,14 @@ const TodoListScreen = () => {
                     ) : (
                       // Tab "Done"
                       taskList.map((section) => {
-                        if (section.tasks.length === 0) return null;
-                        
-                        const doneTasks = section.tasks.filter(task => task.completed);
-                        if (doneTasks.length === 0) return null;
+                        const completedTasks = section.tasks.filter(task => task.completed);
+                        if (completedTasks.length === 0) return null;
                         
                         return (
-                          <View key={`done-${section.date}`} style={styles.taskSectionContainer}>
-                            <Text style={[styles.taskSectionTitle, { color: '#f03a6c' }]}>
-                              {section.date}
-                            </Text>
+                          <View key={`completed-${section.date}`} style={[styles.taskSectionContainer, styles.completedTaskSection]}>
+                            <Text style={styles.taskSectionTitle}>{formatDate(new Date(section.date))}</Text>
                             <FlatList
-                              data={doneTasks}
+                              data={completedTasks}
                               keyExtractor={(item) => item.id}
                               renderItem={({ item }) => (
                                 <TaskItem
@@ -822,8 +776,314 @@ const TodoListScreen = () => {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      {/* Add Task Button */}
+      <TouchableOpacity
+        style={styles.addTaskButton}
+        onPress={() => {
+          setNewTask({ id: '', title: '', completed: false, dueDate: new Date() });
+          setIsTaskModalVisible(true);
+          setIsEditMode(false);
+        }}
+      >
+        <Text style={styles.addTaskButtonText}>+</Text>
+      </TouchableOpacity>
+
+      {/* Context Menu Modal */}
+      <Modal
+        transparent
+        visible={isContextMenuVisible}
+        animationType="fade"
+        onRequestClose={() => setIsContextMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.contextMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setIsContextMenuVisible(false)}
+        >
+          <View
+            style={[
+              styles.contextMenuContainer,
+              {
+                right: 20,
+                top: Math.min(contextMenuPosition.y - 50, Dimensions.get('window').height - 200),
+              },
+            ]}
+          >
+            <TouchableOpacity style={styles.contextMenuItem}>
+              <Text style={styles.contextMenuItemText}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.contextMenuItem}
+              onPress={() => {
+                if (selectedTask) {
+                  setNewTask(selectedTask);
+                  setIsTaskModalVisible(true);
+                  setIsEditMode(true);
+                  setIsContextMenuVisible(false);
+                }
+              }}
+            >
+              <Text style={styles.contextMenuItemText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.contextMenuItem}
+              onPress={handleDeleteSingleTask}
+            >
+              <Text style={styles.contextMenuItemText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Task Modal */}
+      <Modal
+        transparent
+        visible={isTaskModalVisible}
+        animationType="fade"
+        onRequestClose={() => setIsTaskModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <Animated.View style={[styles.modalContainer, { opacity: fadeAnim }]}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{isEditMode ? 'Edit Task' : 'Add New Task'}</Text>
+                  <TouchableOpacity onPress={() => setIsTaskModalVisible(false)}>
+                    <Ionicons name="close" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.dateTimeContainer}>
+                  <TouchableOpacity 
+                    style={styles.dateTimeButton}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Ionicons name="calendar-outline" size={20} color="#f03a6c" />
+                    <Text style={styles.dateTimeText}>
+                      {formatDate(newTask.dueDate)}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.dateTimeButton}
+                    onPress={() => setShowTimePicker(true)}
+                  >
+                    <Ionicons name="time-outline" size={20} color="#f03a6c" />
+                    <Text style={styles.dateTimeText}>
+                      {newTask.dueDate.toLocaleTimeString('en-GB', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <DateTimePickerModal
+                  isVisible={showDatePicker}
+                  mode="date"
+                  onConfirm={(date) => {
+                    setShowDatePicker(false);
+                    if (isTaskModalVisible) {
+                      handleDateConfirm(date);
+                    }
+                  }}
+                  onCancel={() => setShowDatePicker(false)}
+                  date={newTask.dueDate}
+                  is24Hour={true}
+                />
+
+                <DateTimePickerModal
+                  isVisible={showTimePicker}
+                  mode="time"
+                  onConfirm={handleTimeConfirm}
+                  onCancel={() => setShowTimePicker(false)}
+                  date={newTask.dueDate}
+                  is24Hour={true}
+                />
+
+                <TextInput
+                  style={styles.taskInput}
+                  placeholder="Enter task title..."
+                  value={newTask.title}
+                  onChangeText={(text) => setNewTask(prev => ({ ...prev, title: text }))}
+                />
+
+                <View style={styles.modalButtonContainer}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => setIsTaskModalVisible(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.submitButton]}
+                    onPress={handleSaveTaskData}
+                  >
+                    <Text style={styles.modalButtonText}>{isEditMode ? 'Save' : 'Add'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Animated.View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
+
+// Component to display tasks in search results
+const SearchResultTaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onOptionsPress, isSelected, onSelect, isSelectionMode }) => {
+  const formatFullDate = (date: Date) => {
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const weekday = weekdays[date.getDay()];
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${weekday}, ${day} ${month} ${year}`;
+  };
+
+  return (
+    <View style={styles.taskContainer}>
+      {isSelectionMode ? (
+        <TouchableOpacity
+          style={[styles.taskCheckbox, isSelected && styles.taskCheckboxSelected]}
+          onPress={() => onSelect(task.id)}
+        >
+          {isSelected && <View style={styles.taskCheckboxInner} />}
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.taskStatusIndicator}
+          onPress={() => onToggle(task.id)}
+        >
+          <Ionicons 
+            name={task.completed ? "checkmark" : "ellipse-outline"} 
+            size={18} 
+            color={task.completed ? "#4CAF50" : "#f03a6c"} 
+          />
+        </TouchableOpacity>
+      )}
+      <View style={styles.taskTextContainer}>
+        <Text style={[
+          styles.taskDescription,
+          task.completed && styles.completedTaskText
+        ]}>
+          {task.title}
+        </Text>
+        
+        <View style={styles.taskDateContainer}>
+          <Ionicons name="calendar-outline" size={14} color="#888" />
+          <Text style={styles.taskDateText}>
+            {formatFullDate(task.dueDate)}
+          </Text>
+        </View>
+        
+        <View style={styles.taskTimeContainer}>
+          <Ionicons name="time-outline" size={14} color="#888" />
+          <Text style={styles.taskTimeText}>
+            {task.dueDate.toLocaleTimeString('en-GB', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            })}
+          </Text>
+        </View>
+      </View>
+      {!isSelectionMode && (
+        <TouchableOpacity
+          style={styles.taskOptionsButton}
+          onPress={(e) => onOptionsPress(task, e)}
+        >
+          <Text style={styles.taskOptionsIcon}>...</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
+
+// COMPONENTS
+const CalendarDay: React.FC<CalendarDayProps> = ({
+  day,
+  month,
+  year,
+  isCurrentMonth,
+  isSelected,
+  onSelect,
+}) => (
+  <TouchableOpacity
+    style={[
+      styles.calendarDayContainer,
+      isSelected && styles.selectedDay,
+      !isCurrentMonth && styles.otherMonthDay,
+    ]}
+    onPress={() => onSelect(day, month, year)}
+  >
+    <Text
+      style={[
+        styles.calendarDayLabel,
+        isSelected && styles.selectedDayText,
+        !isCurrentMonth && styles.otherMonthDayText,
+      ]}
+    >
+      {day}
+    </Text>
+  </TouchableOpacity>
+);
+
+const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onOptionsPress, isSelected, onSelect, isSelectionMode }) => (
+  <View style={styles.taskContainer}>
+    {isSelectionMode ? (
+      <TouchableOpacity
+        style={[styles.taskCheckbox, isSelected && styles.taskCheckboxSelected]}
+        onPress={() => onSelect(task.id)}
+      >
+        {isSelected && <View style={styles.taskCheckboxInner} />}
+      </TouchableOpacity>
+    ) : (
+      <TouchableOpacity
+        style={styles.taskStatusIndicator}
+        onPress={() => onToggle(task.id)}
+      >
+        <Ionicons 
+          name={task.completed ? "checkmark" : "ellipse-outline"} 
+          size={18} 
+          color={task.completed ? "#4CAF50" : "#f03a6c"} 
+        />
+      </TouchableOpacity>
+    )}
+    <View style={styles.taskTextContainer}>
+      <Text style={[
+        styles.taskDescription,
+        task.completed && styles.completedTaskText
+      ]}>
+        {task.title}
+      </Text>
+      <View style={styles.taskTimeContainer}>
+        <Ionicons name="time-outline" size={14} color="#888" />
+        <Text style={styles.taskTimeText}>
+          {task.dueDate.toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          })}
+        </Text>
+      </View>
+    </View>
+    {!isSelectionMode && (
+      <TouchableOpacity
+        style={styles.taskOptionsButton}
+        onPress={(e) => onOptionsPress(task, e)}
+      >
+        <Text style={styles.taskOptionsIcon}>...</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+);
 
 export default TodoListScreen;
