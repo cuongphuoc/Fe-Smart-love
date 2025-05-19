@@ -2,8 +2,10 @@ import { StyleSheet, View, Text, Image, TouchableOpacity, ScrollView } from 'rea
 import { useFonts, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useState } from 'react';
-import { useRoute } from "@react-navigation/native";
-import { useNavigation } from '@react-navigation/native';  // Import useNavigation
+import { useRoute, useNavigation } from "@react-navigation/native";
+import { API_URL } from "../../constants/Gloubal";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Footer from '@/components/Footer';
 SplashScreen.preventAutoHideAsync();
 
 const formatDate = (dateString: any) => {
@@ -14,88 +16,113 @@ const formatDate = (dateString: any) => {
   return `${day} ${month} ${year}`;
 };
 
-export default function TabTwoScreen() {
-  const [triggerXoa, setTriggerXoa] = useState(false);
-  
-  
-  type RouteParams = { day?: string ,temp?:Int16Array ,isedit?:boolean};
-  const route = useRoute<{ params: RouteParams }>();
-  const navigation = useNavigation(); // Khởi tạo useNavigation
-  const rawDate = route.params?.day || new Date().toISOString();
-  const temp= route.params?.temp || 0;
-  
-console.log(temp);
-  const [fontsLoaded] = useFonts({ PlayfairBold: PlayfairDisplay_700Bold });
-  const [diaryData, setDiaryData] = useState([]);
+// Component tự động lấy tỉ lệ ảnh base64 và áp dụng aspectRatio
+const AutoImage = ({ source }: { source: string }) => {
+  const [aspectRatio, setAspectRatio] = useState<number>(1);
 
   useEffect(() => {
-    
-    const fetchData = async () => {
-      
+    Image.getSize(
+    source,
+    (width, height) => setAspectRatio((width / height)),
+    () => setAspectRatio(0.5) // fallback
+  );
+  }, [source]);
+
+  return (
+    <Image
+      source={{ uri: source }}
+      style={[styles.headerImage, { aspectRatio }]}
+      resizeMode="contain"
+    />
+  );
+};
+
+export default function TabTwoScreen() {
+  const [triggerXoa, setTriggerXoa] = useState(false);
+  const route = useRoute<any>();
+  const navigation = useNavigation();
+  const rawDate = route.params?.day || new Date().toISOString();
+  const temp = route.params?.temp || 0;
+  const temp1 = route.params?.temp1 || 0;
+
+  const [fontsLoaded] = useFonts({ PlayfairBold: PlayfairDisplay_700Bold });
+  const [diaryData, setDiaryData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const checkAuthAndFetchData = async () => {
       try {
-        const response = await fetch(`http://localhost:3000/api/diaries?date=${encodeURIComponent(rawDate)}`, {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          navigation.navigate('login' as never);
+          return;
+        }
+
+        const response = await fetch(`${API_URL}/api/diaries?date=${rawDate}`, {
           method: 'GET',
-          headers: { Accept: 'application/json' }
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         const data = await response.json();
-        console.log('Diary data:', data);
         setDiaryData(data);
-
       } catch (error: any) {
         console.error('Error fetching diaries:', error.message);
       }
     };
-    fetchData();
-  }, [rawDate,triggerXoa,temp]);
-  
+
+    checkAuthAndFetchData();
+  }, [rawDate, triggerXoa, temp, temp1]);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) await SplashScreen.hideAsync();
   }, [fontsLoaded]);
 
   const handleEdit = (item: any) => {
-    console.log("Editing diary:", item);
-    // Ví dụ: navigation.navigate("EditDiary", { diary: item });
-    //Navigation.navigate('PostDiary', { diary: item });
     navigation.navigate('postdiary', { diary: item });
   };
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/diaries/${id}`, {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        navigation.navigate('login' as never);
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/api/diaries/${id}`, {
         method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
       });
+
       if (res.ok) {
-        setDiaryData(prev => prev.filter((d: any) => d.id !== id));
-        setTriggerXoa(prev => !prev); 
-        
-      } else {
-        console.log("Delete failed");
+        setDiaryData(prev => prev.filter(d => d._id !== id));
+        setTriggerXoa(prev => !prev);
       }
     } catch (err) {
       console.log("Error deleting diary:", err);
     }
   };
-  
 
   if (!fontsLoaded) return null;
 
   const DiaryItem = ({ item }: any) => (
     <View style={styles.diaryContainer}>
       <View style={styles.headerContainer}>
-        <Text style={styles.dateText}>
-          {item.date ? formatDate(item.date) : 'Unknown date'}
-        </Text>
+        <Text style={styles.dateText}>{item.date ? formatDate(item.date) : 'Unknown date'}</Text>
         <Text style={styles.loveText}>{item.dayCount || '500 days'}</Text>
       </View>
 
       <View style={styles.imageContainer}>
-        <Image
-          source={item.link_img}
-          style={styles.headerImage}
-          resizeMode="cover"
-        />
+        {item.link_img ? (
+          <AutoImage source={`data:image/jpeg;base64,${item.link_img}`} />
+        ) : (
+          <View style={styles.headerImagePlaceholder} />
+        )}
       </View>
 
       <Text style={styles.title}>{item.title || 'Untitled'}</Text>
@@ -112,12 +139,8 @@ console.log(temp);
 
       <View style={styles.avatarContainer}>
         <Text style={styles.author}>{item.author || 'Anonymous'}</Text>
-        <Image
-          source={require('@/assets/images/phai.png')}
-          style={styles.avatar}
-        />
+        <Image source={require('@/assets/images/phai.png')} style={styles.avatar} />
       </View>
-      
 
       <View style={styles.dashedLine} />
     </View>
@@ -126,16 +149,19 @@ console.log(temp);
   return (
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-        {diaryData.map((item, index) => (
-          <DiaryItem key={index} item={item} />
-        ))}
+        {diaryData.length > 0 ? (
+          diaryData.map((item, index) => <DiaryItem key={index} item={item} />)
+        ) : (
+          <Text style={styles.noDataText}>Không có dữ liệu nhật ký cho ngày này.</Text>
+        )}
       </ScrollView>
 
       <View style={styles.addButtonWrapper}>
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('postdiary')}>
           <Text style={styles.plusText}>+</Text>
         </TouchableOpacity>
       </View>
+      <Footer/>
     </View>
   );
 }
@@ -168,7 +194,13 @@ const styles = StyleSheet.create({
   },
   headerImage: {
     width: '100%',
+    height: undefined,
+    borderRadius: 20,
+  },
+  headerImagePlaceholder: {
+    width: '100%',
     height: 169,
+    backgroundColor: '#f0f0f0',
     borderRadius: 20,
   },
   title: {
@@ -224,32 +256,36 @@ const styles = StyleSheet.create({
     marginTop: 10,
     height: 1,
     width: '50%',
-    borderBottomWidth: 2,
-    borderBottomColor: '#ccc',
     borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   addButtonWrapper: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
+    bottom: 40,
+    right: 30,
   },
   addButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: '#FF5277',
+    backgroundColor: '#3B82F6',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
   },
   plusText: {
-    fontSize: 50,
-    color: '#FF5277',
-    fontWeight: '100',
-    paddingBottom: 10,
+    fontSize: 32,
+    color: 'white',
+    lineHeight: 32,
+  },
+  noDataText: {
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 16,
+    color: '#888',
   },
 });

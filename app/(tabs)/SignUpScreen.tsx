@@ -6,56 +6,83 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Alert, // Import Alert để hiển thị thông báo
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
-import CheckBox from 'react-native-check-box';
 import { useNavigation } from '@react-navigation/native';
+import { API_URL } from "../../constants/Gloubal";
 const SignUpScreen = () => {
   const navigation = useNavigation();
 
-  const [toggleCheckBox, setToggleCheckBox] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [passwordConfirmVisible, setPasswordConfirmVisible] = useState(false);
   const [name, setName] = useState('');
-  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [emailError, setEmailError] = useState('');
 
-  // Kiểm tra tất cả điều kiện để bật nút "Create Account"
+  const isValidEmail = (text) => {
+    return text.includes('@');
+  };
+
   const isFormValid = () => {
     return (
       name.trim() !== '' &&
-      emailOrPhone.trim() !== '' &&
+      email.trim() !== '' &&
+      isValidEmail(email) &&
       password.trim() !== '' &&
       confirmPassword.trim() !== '' &&
-      password === confirmPassword &&
-      toggleCheckBox
+      password === confirmPassword
     );
+  };
+
+  const handleEmailChange = (text) => {
+    setEmail(text);
+    if (!isValidEmail(text)) {
+      setEmailError('Please enter a valid email address.');
+    } else {
+      setEmailError('');
+    }
+  };
+
+  const handleCreateAccount = async () => {
+    if (isFormValid()) {
+      try {
+        const response = await fetch(`${API_URL}/api/users/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            
+          },
+          body: JSON.stringify({
+            name: name,
+            email: email,
+            password: password,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // Đăng ký thành công, có thể chuyển hướng người dùng hoặc hiển thị thông báo
+          Alert.alert('Success', 'Account created successfully!');
+          navigation.navigate('login'); // Ví dụ: chuyển đến màn hình đăng nhập
+        } else {
+          // Đăng ký thất bại, hiển thị thông báo lỗi từ API
+          Alert.alert('Error', data.message || 'Failed to create account.');
+        }
+      } catch (error) {
+        // Lỗi mạng hoặc lỗi không mong muốn
+        Alert.alert('Error', 'An unexpected error occurred.');
+        console.error('Sign up error:', error);
+      }
+    }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Sign Up</Text>
-
-
-      {/* Social Buttons */}
-      <View style={styles.socialContainer}>
-        <TouchableOpacity style={[styles.socialButton, styles.facebookButton]}>
-          <Icon name="facebook-f" size={20} color="#2563EB" />
-          <Text style={styles.facebookText}>Facebook</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.socialButton, styles.googleButton]}>
-          <Icon name="google" size={20} color="#DC2626" />
-          <Text style={styles.googleText}>Google</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Divider with "Or" */}
-      <View style={styles.dividerContainer}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>Or</Text>
-        <View style={styles.dividerLine} />
-      </View>
 
       {/* Form */}
       <View style={styles.formContainer}>
@@ -68,11 +95,12 @@ const SignUpScreen = () => {
         />
         <TextInput
           style={styles.input}
-          placeholder="Email/Phone Number"
+          placeholder="Email Address"
           placeholderTextColor="#9CA3AF"
-          value={emailOrPhone}
-          onChangeText={setEmailOrPhone}
+          value={email}
+          onChangeText={handleEmailChange}
         />
+        {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
         <View style={styles.passwordContainer}>
           <TextInput
             style={styles.input}
@@ -116,32 +144,14 @@ const SignUpScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Checkbox */}
-        <View style={styles.checkboxContainer}>
-          <CheckBox
-            style={{ padding: 10 }}
-            onClick={() => setToggleCheckBox(!toggleCheckBox)}
-            isChecked={toggleCheckBox}
-            checkBoxColor="#2563EB"
-          />
-          <Text style={styles.checkboxText} numberOfLines={2} ellipsizeMode="tail">
-            I'm agree to the{' '}
-            <Text style={styles.linkText}>Terms of Service</Text> and{' '}
-            <Text style={styles.linkText}>Privacy Policy</Text>
-          </Text>
-        </View>
-
         {/* Create Account Button */}
         <TouchableOpacity
           style={[
             styles.createButton,
-            { backgroundColor: isFormValid() ? '#EF4444' : '#FEE2E2' }, // Đổi màu khi hợp lệ
+            { backgroundColor: isFormValid() ? '#EF4444' : '#FEE2E2' },
           ]}
-          disabled={!isFormValid()} // Vô hiệu hóa khi không hợp lệ
-          onPress={() => {
-            // Xử lý khi nhấn "Create Account" (ví dụ: gửi dữ liệu lên server)
-            console.log('Account created:', { name, emailOrPhone, password });
-          }}
+          disabled={!isFormValid()}
+          onPress={handleCreateAccount} // Gọi hàm xử lý API call
         >
           <Text style={styles.createButtonText}>Create Account</Text>
         </TouchableOpacity>
@@ -150,9 +160,9 @@ const SignUpScreen = () => {
       {/* Sign In Link */}
       <View style={styles.signInContainer}>
         <Text style={styles.signInText}>Do you have an account? </Text>
-       <TouchableOpacity onPress={() => navigation.navigate('login')}>
-  <Text style={styles.linkText}>Sign In</Text>
-</TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('login')}>
+          <Text style={styles.linkText}>Sign In</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -173,49 +183,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  socialContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 16,
-  },
-  socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '48%',
-    padding: 12,
-    borderRadius: 8,
-  },
-  facebookButton: {
-    backgroundColor: '#DBEAFE',
-  },
-  googleButton: {
-    backgroundColor: '#FEE2E2',
-  },
-  facebookText: {
-    color: '#2563EB',
-    marginLeft: 8,
-  },
-  googleText: {
-    color: '#DC2626',
-    marginLeft: 8,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#D1D5DB',
-  },
-  dividerText: {
-    color: '#6B7280',
-    paddingHorizontal: 8,
-  },
   formContainer: {
     width: '100%',
   },
@@ -224,36 +191,23 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#EFF6FF',
     borderRadius: 8,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   passwordContainer: {
     position: 'relative',
+    marginBottom: 16,
   },
   eyeIcon: {
     position: 'absolute',
     right: 12,
     top: 12,
   },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    width: '100%',
-  },
-  checkboxText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 8,
-    flexShrink: 1,
-  },
-  linkText: {
-    color: '#EF4444',
-  },
   createButton: {
     width: '100%',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
+    marginTop: 16,
   },
   createButtonText: {
     color: '#FFFFFF',
@@ -267,6 +221,14 @@ const styles = StyleSheet.create({
   signInText: {
     color: '#6B7280',
     textAlign: 'center',
+  },
+  linkText: {
+    color: '#EF4444',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginBottom: 8,
   },
 });
 
