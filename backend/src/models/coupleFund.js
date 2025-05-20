@@ -39,6 +39,30 @@ const coupleFundSchema = new mongoose.Schema({
     required: true,
     default: 'Couple Fund'
   },
+  description: {
+    type: String,
+    default: "Let's create goals and make dreams come true"
+  },
+  image: {
+    type: String,
+    default: null
+  },
+  avatarUrls: {
+    type: [String],
+    default: []
+  },
+  altImage: {
+    type: String,
+    default: 'Fund image'
+  },
+  altAvatar1: {
+    type: String,
+    default: 'Avatar of person 1'
+  },
+  altAvatar2: {
+    type: String,
+    default: 'Avatar of person 2'
+  },
   balance: {
     type: Number,
     required: true,

@@ -15,6 +15,7 @@ import {
   Easing,
   Dimensions,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import { FontAwesome5, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +27,7 @@ import * as Font from 'expo-font';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { registerForPushNotificationsAsync, sendFundCompletionNotification } from '../../utils/notifications';
 import axios from 'axios';
+import { useNavigation } from '@react-navigation/native';
 
 // Constants
 const API_BASE_URL = Platform.OS === 'android' 
@@ -76,16 +78,13 @@ const fundService = {
           id: fund._id,
           title: fund.name,
           description: fund.description || "Let's create goals and make dreams come true",
-          image: fund.image || 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
+          image: fund.image || '',
           amount: formatAmount(fund.balance.toString()),
           targetAmount: formatAmount(fund.goal.amount.toString()),
-          avatars: fund.avatarUrls || [
-            'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
-            'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
-          ],
-          altImage: 'Fund image',
-          altAvatar1: 'Avatar of person 1',
-          altAvatar2: 'Avatar of person 2',
+          avatars: fund.avatarUrls || [],
+          altImage: fund.altImage || 'Fund image',
+          altAvatar1: fund.altAvatar1 || 'Avatar of person 1',
+          altAvatar2: fund.altAvatar2 || 'Avatar of person 2',
           createdAt: formatDateTime(new Date(fund.createdAt)),
           modifiedAt: fund.updatedAt !== fund.createdAt ? formatDateTime(new Date(fund.updatedAt)) : undefined
         }));
@@ -126,16 +125,13 @@ const fundService = {
           id: data._id,
           title: data.name,
           description: data.description || "Let's create goals and make dreams come true",
-          image: data.image || 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
+          image: data.image || '',
           amount: formatAmount(data.balance.toString()),
           targetAmount: formatAmount(data.goal.amount.toString()),
-          avatars: data.avatarUrls || [
-            'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
-            'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
-          ],
-          altImage: 'Fund image',
-          altAvatar1: 'Avatar of person 1',
-          altAvatar2: 'Avatar of person 2',
+          avatars: data.avatarUrls || [],
+          altImage: data.altImage || 'Fund image',
+          altAvatar1: data.altAvatar1 || 'Avatar of person 1',
+          altAvatar2: data.altAvatar2 || 'Avatar of person 2',
           createdAt: formatDateTime(new Date(data.createdAt)),
           modifiedAt: undefined
         };
@@ -156,6 +152,7 @@ const fundService = {
         description: fundData.description,
         balance: parseInt(fundData.amount?.replace(/[^\d]/g, '') || '0'),
         image: fundData.image,
+        avatarUrls: fundData.avatars,
         goal: {
           name: fundData.title,
           amount: parseInt(fundData.targetAmount?.replace(/[^\d]/g, '') || '0')
@@ -174,16 +171,13 @@ const fundService = {
           id: data._id,
           title: data.name,
           description: data.description,
-          image: data.image || 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
+          image: data.image || '',
           amount: formatAmount(data.balance.toString()),
           targetAmount: formatAmount(data.goal.amount.toString()),
-          avatars: data.avatarUrls || [
-            'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
-            'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
-          ],
-          altImage: 'Fund image',
-          altAvatar1: 'Avatar of person 1',
-          altAvatar2: 'Avatar of person 2',
+          avatars: data.avatarUrls || [],
+          altImage: data.altImage || 'Fund image',
+          altAvatar1: data.altAvatar1 || 'Avatar of person 1',
+          altAvatar2: data.altAvatar2 || 'Avatar of person 2',
           createdAt: formatDateTime(new Date(data.createdAt)),
           modifiedAt: formatDateTime(new Date(data.updatedAt))
         };
@@ -292,7 +286,8 @@ const formatNumberWithDots = (number: string): string => {
   const cleanNumber = number.replace(/[^\d]/g, '');
   if (!cleanNumber) return '';
   const num = parseInt(cleanNumber, 10);
-  return num.toLocaleString('en-GB');
+  // Use dots for thousand separators
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
 
 const formatAmount = (amount: string): string => {
@@ -423,9 +418,21 @@ const CoupleFundScreen: React.FC = () => {
   const [notificationsPermission, setNotificationsPermission] = useState(false);
   const [notifiedFunds, setNotifiedFunds] = useState<string[]>([]);
 
+  const navigation = useNavigation();
+
   // Effects
   useEffect(() => {
     loadFundsData();
+
+    // Also reload funds data when the tab is focused
+    const unsubscribe = navigation?.addListener('focus', () => {
+      console.log('CoupleFund tab focused, reloading data');
+      loadFundsData();
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -435,12 +442,12 @@ const CoupleFundScreen: React.FC = () => {
   useEffect(() => {
     if (selectedFund) {
       const progress = calculateProgress(selectedFund.amount, selectedFund.targetAmount);
-      if (progress >= 100 && !showCelebration) {
+      if (progress >= 100) {
         setShowCelebration(true);
         setTimeout(() => {
           confettiRef.current?.start();
         }, 500);
-      } else if (progress < 100) {
+      } else {
         setShowCelebration(false);
       }
     }
@@ -500,7 +507,7 @@ const CoupleFundScreen: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // First try to load from API with timeout protection
+      // First try to load from API
       console.log('Attempting to load from API');
       const apiDataPromise = fundService.getAllFunds();
       
@@ -519,6 +526,10 @@ const CoupleFundScreen: React.FC = () => {
       if (apiData && apiData.length > 0) {
         console.log('Successfully loaded data from API, found', apiData.length, 'funds');
         setFunds(apiData);
+        
+        // Save API data to local storage as backup
+        await saveFundsData(apiData);
+        
         setIsLoading(false);
         return;
       }
@@ -572,39 +583,80 @@ const CoupleFundScreen: React.FC = () => {
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.8,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const newImageUri = result.assets[0].uri;
+        
+        // Convert to base64 if not already available
+        const base64Image = result.assets[0].base64 
+          ? `data:image/jpeg;base64,${result.assets[0].base64}`
+          : await convertImageToBase64(newImageUri);
+          
+        console.log('Image selected, size:', base64Image.length);
+        
+        // First update the UI with local URI for better user experience
         setSelectedImage(newImageUri);
         
         if (selectedFund) {
-          // In a real app, you'd upload the image to your server here
-          // and get back a URL to use in the update
-          
-          // For now, we'll just use the local URI
-          const updatedFund = { ...selectedFund, image: newImageUri };
-          
           try {
-            // Update fund with new image
-            await fundService.updateFund(selectedFund.id, { image: newImageUri });
+            console.log('Updating fund with new image...');
             
-            // Update local state
+            // Update fund with base64 image (will be stored on server)
+            const updatedFund = await fundService.updateFund(selectedFund.id, { 
+              image: base64Image,
+              // Make sure to pass existing values to avoid resetting them
+              title: selectedFund.title,
+              description: selectedFund.description,
+              amount: selectedFund.amount,
+              targetAmount: selectedFund.targetAmount
+            });
+            
+            console.log('Fund updated with new image:', updatedFund.image);
+            
+            // Update local state with server response
             setSelectedFund(updatedFund);
+            
             const updatedFunds = funds.map(fund => 
               fund.id === selectedFund.id ? updatedFund : fund
             );
             setFunds(updatedFunds);
             await saveFundsData(updatedFunds);
+            
+            // Alert user of success
+            Alert.alert('Success', 'Image updated successfully');
           } catch (error) {
             console.error('Error updating fund image:', error);
             Alert.alert('Error', 'Failed to update fund image. Please try again.');
+            // Reset selected image
+            setSelectedImage(selectedFund.image);
           }
         }
       }
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  // Helper to convert an image URI to base64
+  const convertImageToBase64 = async (uri: string): Promise<string> => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result);
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error converting image to base64:', error);
+      return '';
     }
   };
 
@@ -669,13 +721,10 @@ const CoupleFundScreen: React.FC = () => {
       const fundData = {
         title: newFund.title,
         description: newFund.description || "Let's create goals and make dreams come true",
-        image: 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
+        image: '', // No preset image
         amount: formattedAmount,
         targetAmount: formattedTargetAmount,
-        avatars: [
-          'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
-          'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
-        ]
+        avatars: [] // No preset avatars
       };
       
       // Create fund via API
@@ -717,6 +766,10 @@ const CoupleFundScreen: React.FC = () => {
       const currentAmountValue = parseInt(formattedCurrentAmount.replace(/[^\d]/g, ''), 10);
       const prevAmountValue = parseInt(selectedFund.amount.replace(/[^\d]/g, ''), 10);
       
+      // Logging for debugging
+      console.log('Editing fund - current amount value:', currentAmountValue);
+      console.log('Editing fund - prev amount value:', prevAmountValue);
+      
       const fundData = {
         title: editingFund.title,
         description: editingFund.description || selectedFund.description,
@@ -727,21 +780,6 @@ const CoupleFundScreen: React.FC = () => {
       
       // Update fund via API
       const updatedFund = await fundService.updateFund(selectedFund.id, fundData);
-      
-      // If amount has changed, add a transaction
-      if (currentAmountValue !== prevAmountValue) {
-        const difference = currentAmountValue - prevAmountValue;
-        if (difference !== 0) {
-          const type = difference > 0 ? 'deposit' : 'withdraw';
-          const description = `${type === 'deposit' ? 'Added' : 'Withdrew'} ${formatNumberWithDots(Math.abs(difference).toString())}đ to fund`;
-          
-          try {
-            await fundService.addTransaction(selectedFund.id, Math.abs(difference), type, description);
-          } catch (transactionError) {
-            console.error('Error adding transaction:', transactionError);
-          }
-        }
-      }
       
       // Update local state
       const updatedFunds = funds.map(fund => 
@@ -811,38 +849,66 @@ const CoupleFundScreen: React.FC = () => {
   };
 
   // Render functions
-  const renderFundItem = ({ item }: { item: Fund }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => setSelectedFund(item)}
-    >
-      <Image
-        source={{ uri: item.image }}
-        style={styles.cardImage}
-        accessibilityLabel={item.altImage}
-      />
-      <View style={styles.cardTitleContainer}>
-        <Text style={styles.cardTitle}>{item.title}</Text>
-        <Text style={styles.cardDate}>{item.createdAt}</Text>
-      </View>
-      <View style={styles.cardFooter}>
-        <View style={styles.amountContainerCard}>
-          <Text style={styles.cardAmount}>{item.amount}</Text>
-          <Text style={styles.cardTargetAmount}>/{item.targetAmount}</Text>
+  const renderFundItem = ({ item }: { item: Fund }) => {
+    const progress = calculateProgress(item.amount, item.targetAmount);
+    const isCompleted = progress >= 100;
+    
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => {
+          setSelectedFund(item);
+        }}
+      >
+        {item.image ? (
+          <Image
+            source={{ uri: item.image }}
+            style={styles.cardImage}
+            accessibilityLabel={item.altImage}
+          />
+        ) : (
+          <View style={[styles.cardImage, styles.placeholderImage]}>
+            <FontAwesome5 name="money-bill-wave" size={32} color="#e5e5e5" />
+          </View>
+        )}
+        <View style={styles.cardTitleContainer}>
+          <Text style={styles.cardTitle}>{item.title}</Text>
+          <Text style={styles.cardDate}>{item.createdAt}</Text>
         </View>
-        <View style={styles.avatarContainer}>
-          {item.avatars.map((avatar, index) => (
-            <Image
-              key={index}
-              source={{ uri: avatar }}
-              style={styles.avatar}
-              accessibilityLabel={index === 0 ? item.altAvatar1 : item.altAvatar2}
-            />
-          ))}
+        <View style={styles.cardFooter}>
+          <View style={styles.amountContainerCard}>
+            {isCompleted ? (
+              <View style={styles.completedStatus}>
+                <FontAwesome5 name="check-circle" size={16} color="#4CAF50" />
+                <Text style={styles.completedText}>DONE</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.cardAmount}>{item.amount}</Text>
+                <Text style={styles.cardTargetAmount}>/{item.targetAmount}</Text>
+              </>
+            )}
+          </View>
+          <View style={styles.avatarContainer}>
+            {item.avatars && item.avatars.length > 0 ? (
+              item.avatars.map((avatar, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: avatar }}
+                  style={styles.avatar}
+                  accessibilityLabel={index === 0 ? item.altAvatar1 : item.altAvatar2}
+                />
+              ))
+            ) : (
+              <View style={styles.avatar}>
+                <FontAwesome5 name="user" size={18} color="#e5e5e5" />
+              </View>
+            )}
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderSearchBar = () => (
     <View style={styles.searchContainer}>
@@ -927,205 +993,218 @@ const CoupleFundScreen: React.FC = () => {
     </>
   );
 
-  const renderFundDetail = () => (
-    <SafeAreaView style={styles.detailContainer}>
-      <View style={[styles.detailHeader, { paddingTop: insets.top || 12 }]}>
-        <TouchableOpacity
-          accessibilityLabel="Back"
-          onPress={() => setSelectedFund(null)}
-        >
-          <FontAwesome5 name="chevron-left" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.detailHeaderTitle}>
-          {selectedFund?.title || ''}
-        </Text>
-        <TouchableOpacity 
-          accessibilityLabel="Edit"
-          onPress={() => {
-            if (!isEditMode) {
-              setEditingFund({
-                title: selectedFund?.title || '',
-                description: selectedFund?.description || '',
-                currentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '',
-                targetAmount: selectedFund?.targetAmount || '',
-              });
-            }
-            setIsEditMode(!isEditMode);
-          }}
-        >
-          <FontAwesome5 name={isEditMode ? "check" : "edit"} size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: selectedImage || selectedFund?.image }}
-            style={styles.backgroundImage}
-            accessibilityLabel={selectedFund?.altImage}
-          />
+  const renderFundDetail = () => {
+    if (!selectedFund) return null;
+    
+    const progress = calculateProgress(selectedFund.amount, selectedFund.targetAmount);
+    const isCompleted = progress >= 100;
+    
+    return (
+      <SafeAreaView style={styles.detailContainer}>
+        <View style={[styles.detailHeader, { paddingTop: insets.top || 12 }]}>
           <TouchableOpacity
-            style={styles.changePhotoButton}
-            activeOpacity={0.8}
-            accessibilityLabel="Change photo"
-            onPress={handleImagePick}
+            accessibilityLabel="Back"
+            onPress={() => setSelectedFund(null)}
           >
-            <LinearGradient
-              colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.changePhotoGradient}
-            >
-              <View style={styles.changePhotoIconContainer}>
-                <FontAwesome5 name="camera" size={14} color="#EE1D52" />
-              </View>
-              <Text style={styles.changePhotoText}>Change photo</Text>
-            </LinearGradient>
+            <FontAwesome5 name="chevron-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.detailHeaderTitle}>
+            {selectedFund?.title || ''}
+          </Text>
+          <TouchableOpacity 
+            accessibilityLabel="Edit"
+            onPress={() => {
+              if (!isEditMode) {
+                setEditingFund({
+                  title: selectedFund?.title || '',
+                  description: selectedFund?.description || '',
+                  currentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '',
+                  targetAmount: selectedFund?.targetAmount || '',
+                });
+              }
+              setIsEditMode(!isEditMode);
+            }}
+          >
+            <FontAwesome5 name={isEditMode ? "check" : "edit"} size={24} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.detailCard}>
-          <View style={styles.fundInfo}>
-            <View style={styles.createdDateContainer}>
-              <View style={styles.dateItem}>
-                <FontAwesome5 name="calendar-plus" size={14} color="#6B7280" />
-                <Text style={styles.createdDateText}>
-                  Created: {selectedFund?.createdAt?.split(' - ')[0]}
-                </Text>
-              </View>
-              <View style={styles.dateItem}>
-                <FontAwesome5 name="clock" size={14} color="#6B7280" />
-                <Text style={styles.createdDateText}>
-                  Time: {selectedFund?.createdAt?.split(' - ')[1]}
-                </Text>
-              </View>
-              {selectedFund?.modifiedAt && (
-                <>
-                  <View style={styles.dateItem}>
-                    <FontAwesome5 name="calendar-alt" size={14} color="#6B7280" />
-                    <Text style={styles.createdDateText}>
-                      Modified: {selectedFund?.modifiedAt.split(' - ')[0]}
-                    </Text>
-                  </View>
-                  <View style={styles.dateItem}>
-                    <FontAwesome5 name="clock" size={14} color="#6B7280" />
-                    <Text style={styles.createdDateText}>
-                      Time: {selectedFund?.modifiedAt.split(' - ')[1]}
-                    </Text>
-                  </View>
-                </>
-              )}
-            </View>
-            <Text style={styles.fundBalanceLabel}>Fund Progress</Text>
-            <FundProgressBar 
-              progress={calculateProgress(selectedFund?.amount || '0', selectedFund?.targetAmount || '0')} 
-            />
-            {showCelebration && (
-              <View style={styles.celebrationContainer}>
-                <Text style={styles.celebrationText}>🎉 Congratulations! Fund completed! 🎉</Text>
-                <TouchableOpacity 
-                  style={styles.celebrateAgainButton} 
-                  onPress={triggerCelebration}
-                >
-                  <Text style={styles.celebrateAgainText}>Celebrate Again!</Text>
-                </TouchableOpacity>
+        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.imageContainer}>
+            {(selectedImage || selectedFund?.image) ? (
+              <Image
+                source={{ uri: selectedImage || selectedFund?.image }}
+                style={styles.backgroundImage}
+                accessibilityLabel={selectedFund?.altImage}
+              />
+            ) : (
+              <View style={[styles.backgroundImage, styles.placeholderImage]}>
+                <FontAwesome5 name="money-bill-wave" size={48} color="#e5e5e5" />
               </View>
             )}
-            <View style={styles.amountContainer}>
-              <View style={styles.amountBox}>
-                <Text style={styles.amountLabel}>Current Amount</Text>
-                <Text style={styles.fundBalanceAmount}>{selectedFund?.amount}</Text>
+            <TouchableOpacity
+              style={styles.changePhotoButton}
+              activeOpacity={0.8}
+              accessibilityLabel="Change photo"
+              onPress={handleImagePick}
+            >
+              <LinearGradient
+                colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.changePhotoGradient}
+              >
+                <View style={styles.changePhotoIconContainer}>
+                  <FontAwesome5 name="camera" size={14} color="#EE1D52" />
+                </View>
+                <Text style={styles.changePhotoText}>Change photo</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.detailCard}>
+            <View style={styles.fundInfo}>
+              <View style={styles.createdDateContainer}>
+                <View style={styles.dateItem}>
+                  <FontAwesome5 name="calendar-plus" size={14} color="#6B7280" />
+                  <Text style={styles.createdDateText}>
+                    Created: {selectedFund?.createdAt?.split(' - ')[0]}
+                  </Text>
+                </View>
+                <View style={styles.dateItem}>
+                  <FontAwesome5 name="clock" size={14} color="#6B7280" />
+                  <Text style={styles.createdDateText}>
+                    Time: {selectedFund?.createdAt?.split(' - ')[1]}
+                  </Text>
+                </View>
+                {selectedFund?.modifiedAt && (
+                  <>
+                    <View style={styles.dateItem}>
+                      <FontAwesome5 name="calendar-alt" size={14} color="#6B7280" />
+                      <Text style={styles.createdDateText}>
+                        Modified: {selectedFund?.modifiedAt.split(' - ')[0]}
+                      </Text>
+                    </View>
+                    <View style={styles.dateItem}>
+                      <FontAwesome5 name="clock" size={14} color="#6B7280" />
+                      <Text style={styles.createdDateText}>
+                        Time: {selectedFund?.modifiedAt.split(' - ')[1]}
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
-              <View style={styles.amountBox}>
-                <Text style={styles.amountLabel}>Target Amount</Text>
-                <Text style={styles.fundBalanceAmount}>{selectedFund?.targetAmount}</Text>
-              </View>
-            </View>
-            {isEditMode ? (
-              <>
-                {renderEditInputs()}
-                <View style={styles.editButtons}>
+              <Text style={styles.fundBalanceLabel}>Fund Progress</Text>
+              <FundProgressBar 
+                progress={calculateProgress(selectedFund?.amount || '0', selectedFund?.targetAmount || '0')} 
+              />
+              {showCelebration && (
+                <View style={styles.celebrationContainer}>
+                  <Text style={styles.celebrationText}>🎉 Congratulations! Fund completed! 🎉</Text>
                   <TouchableOpacity 
-                    style={[styles.editButton, { backgroundColor: '#9CA3AF' }]}
-                    onPress={() => {
-                      setIsEditMode(false);
-                      setEditingFund({ title: '', description: '', currentAmount: '', targetAmount: '' });
-                    }}
+                    style={styles.celebrateAgainButton} 
+                    onPress={triggerCelebration}
                   >
-                    <Text style={styles.editButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.editButton}
-                    onPress={handleEditFund}
-                  >
-                    <Text style={styles.editButtonText}>Save</Text>
+                    <Text style={styles.celebrateAgainText}>Celebrate Again!</Text>
                   </TouchableOpacity>
                 </View>
-              </>
-            ) : (
-              <Text style={styles.fundDescription}>{selectedFund?.description}</Text>
+              )}
+              <View style={styles.amountContainer}>
+                <View style={styles.amountBox}>
+                  <Text style={styles.amountLabel}>Current Amount</Text>
+                  <Text style={styles.fundBalanceAmount}>{selectedFund?.amount}</Text>
+                </View>
+                <View style={styles.amountBox}>
+                  <Text style={styles.amountLabel}>Target Amount</Text>
+                  <Text style={styles.fundBalanceAmount}>{selectedFund?.targetAmount}</Text>
+                </View>
+              </View>
+              {isEditMode ? (
+                <>
+                  {renderEditInputs()}
+                  <View style={styles.editButtons}>
+                    <TouchableOpacity 
+                      style={[styles.editButton, { backgroundColor: '#9CA3AF' }]}
+                      onPress={() => {
+                        setIsEditMode(false);
+                        setEditingFund({ title: '', description: '', currentAmount: '', targetAmount: '' });
+                      }}
+                    >
+                      <Text style={styles.editButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.editButton}
+                      onPress={handleEditFund}
+                    >
+                      <Text style={styles.editButtonText}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.fundDescription}>{selectedFund?.description}</Text>
+              )}
+            </View>
+
+            {/* <View style={styles.actionSection}>
+              <View style={styles.iconCircle}>
+                <FontAwesome5 name="dollar-sign" size={20} color="#EE1D52" />
+              </View>
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity style={styles.fundButton}>
+                  <Text style={styles.fundButtonText}>+ Fund</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.fundButton}>
+                  <FontAwesome5 name="credit-card" size={14} color="#EE1D52" style={styles.buttonIcon} />
+                  <Text style={styles.fundButtonText}>Withdraw funds</Text>
+                </TouchableOpacity>
+              </View>
+            </View> */}
+
+            <View style={styles.optionsSection}>
+              <View style={styles.optionItem}>
+                <FontAwesome5 name="hand-peace" size={18} color="#EE1D52" />
+                <Text style={styles.optionText}>Reminder to{'\n'}contribute</Text>
+              </View>
+              <View style={styles.optionItem}>
+                <FontAwesome5 name="qrcode" size={18} color="#EE1D52" />
+                <Text style={styles.optionText}>QR fundraiser</Text>
+              </View>
+              <View style={styles.optionItem}>
+                <FontAwesome5 name="money-bill-wave" size={18} color="#EE1D52" />
+                <Text style={styles.optionText}>Payment,{'\n'}money transfer</Text>
+              </View>
+            </View>
+
+            {!isEditMode && (
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={handleDeleteFund}
+              >
+                <FontAwesome5 name="trash-alt" size={16} color="#FFFFFF" />
+                <Text style={styles.deleteButtonText}>Delete Fund</Text>
+              </TouchableOpacity>
             )}
           </View>
-
-          {/* <View style={styles.actionSection}>
-            <View style={styles.iconCircle}>
-              <FontAwesome5 name="dollar-sign" size={20} color="#EE1D52" />
-            </View>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.fundButton}>
-                <Text style={styles.fundButtonText}>+ Fund</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.fundButton}>
-                <FontAwesome5 name="credit-card" size={14} color="#EE1D52" style={styles.buttonIcon} />
-                <Text style={styles.fundButtonText}>Withdraw funds</Text>
-              </TouchableOpacity>
-            </View>
-          </View> */}
-
-          <View style={styles.optionsSection}>
-            <View style={styles.optionItem}>
-              <FontAwesome5 name="hand-peace" size={18} color="#EE1D52" />
-              <Text style={styles.optionText}>Reminder to{'\n'}contribute</Text>
-            </View>
-            <View style={styles.optionItem}>
-              <FontAwesome5 name="qrcode" size={18} color="#EE1D52" />
-              <Text style={styles.optionText}>QR fundraiser</Text>
-            </View>
-            <View style={styles.optionItem}>
-              <FontAwesome5 name="money-bill-wave" size={18} color="#EE1D52" />
-              <Text style={styles.optionText}>Payment,{'\n'}money transfer</Text>
-            </View>
+        </ScrollView>
+        
+        {/* Confetti overlay that will display on top */}
+        {showCelebration && (
+          <View style={styles.confettiOverlay}>
+            <ConfettiCannon
+              ref={confettiRef}
+              count={200}
+              origin={{x: width / 2, y: 0}}
+              autoStart={false}
+              fadeOut
+              explosionSpeed={350}
+              fallSpeed={3000}
+              colors={['#EE1D52', '#FFDF00', '#5EFCE8', '#736EFE', '#EC4899']}
+            />
           </View>
-
-          {!isEditMode && (
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={handleDeleteFund}
-            >
-              <FontAwesome5 name="trash-alt" size={16} color="#FFFFFF" />
-              <Text style={styles.deleteButtonText}>Delete Fund</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </ScrollView>
-      
-      {/* Confetti overlay that will display on top */}
-      {showCelebration && (
-        <View style={styles.confettiOverlay}>
-          <ConfettiCannon
-            ref={confettiRef}
-            count={200}
-            origin={{x: width / 2, y: 0}}
-            autoStart={false}
-            fadeOut
-            explosionSpeed={350}
-            fallSpeed={3000}
-            colors={['#EE1D52', '#FFDF00', '#5EFCE8', '#736EFE', '#EC4899']}
-          />
-        </View>
-      )}
-    </SafeAreaView>
-  );
+        )}
+      </SafeAreaView>
+    );
+  };
 
   const renderFundList = () => (
     <SafeAreaView style={styles.container}>
@@ -1275,3 +1354,21 @@ const CoupleFundScreen: React.FC = () => {
 };
 
 export default CoupleFundScreen;
+
+// Extend existing styles
+Object.assign(styles, {
+  completedStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  completedText: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+    marginLeft: 4,
+    fontSize: 12,
+  },
+});

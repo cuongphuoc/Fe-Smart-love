@@ -1,4 +1,4 @@
-import { StyleSheet, Dimensions, ViewStyle, Platform, StatusBar } from 'react-native';
+import { StyleSheet, Dimensions, ViewStyle, Platform, StatusBar, TextStyle, ImageStyle } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const SCREEN_PADDING = 16;
@@ -29,7 +29,105 @@ const commonHeaderStyles: ViewStyle = {
   shadowRadius: 4,
 };
 
-export const styles = StyleSheet.create({
+interface Styles {
+  container: ViewStyle;
+  header: ViewStyle;
+  headerTitle: TextStyle;
+  placeholderImage: ImageStyle;
+  main: ViewStyle;
+  fundCreationButtonContainer: ViewStyle;
+  fundCreationButton: ViewStyle;
+  gradientButton: ViewStyle;
+  fundCreationText: TextStyle;
+  cardList: ViewStyle;
+  card: ViewStyle;
+  cardImage: ImageStyle;
+  cardTitleContainer: ViewStyle;
+  cardTitle: TextStyle;
+  cardFooter: ViewStyle;
+  amountContainerCard: ViewStyle;
+  cardAmount: TextStyle;
+  cardTargetAmount: TextStyle;
+  avatarContainer: ViewStyle;
+  avatar: ImageStyle;
+  detailContainer: ViewStyle;
+  detailHeader: ViewStyle;
+  detailHeaderTitle: TextStyle;
+  scrollContainer: ViewStyle;
+  imageContainer: ViewStyle;
+  backgroundImage: ImageStyle;
+  changePhotoButton: ViewStyle;
+  changePhotoGradient: ViewStyle;
+  changePhotoIconContainer: ViewStyle;
+  changePhotoText: TextStyle;
+  detailCard: ViewStyle;
+  fundInfo: ViewStyle;
+  fundBalanceLabel: TextStyle;
+  fundBalanceAmount: TextStyle;
+  fundDescription: TextStyle;
+  actionSection: ViewStyle;
+  iconCircle: ViewStyle;
+  buttonContainer: ViewStyle;
+  fundButton: ViewStyle;
+  fundButtonText: TextStyle;
+  buttonIcon: ViewStyle;
+  optionsSection: ViewStyle;
+  optionItem: ViewStyle;
+  optionText: TextStyle;
+  detailBottomNav: ViewStyle;
+  modalContainer: ViewStyle;
+  popupModalContent: ViewStyle;
+  input: TextStyle;
+  editButtons: ViewStyle;
+  editButton: ViewStyle;
+  editButtonText: TextStyle;
+  progressContainer: ViewStyle;
+  progressBar: ViewStyle;
+  progressFill: ViewStyle;
+  progressText: TextStyle;
+  amountContainer: ViewStyle;
+  amountBox: ViewStyle;
+  amountLabel: TextStyle;
+  amountInput: TextStyle;
+  amountInputContainer: ViewStyle;
+  amountInputLabel: TextStyle;
+  loadingContainer: ViewStyle;
+  deleteButton: ViewStyle;
+  deleteButtonText: TextStyle;
+  listContainer: ViewStyle;
+  detailContent: ViewStyle;
+  actionButtons: ViewStyle;
+  searchContainer: ViewStyle;
+  searchInputContainer: ViewStyle;
+  searchInput: TextStyle;
+  searchIcon: ImageStyle;
+  clearButton: ViewStyle;
+  cancelButton: ViewStyle;
+  cancelButtonText: TextStyle;
+  emptyContainer: ViewStyle;
+  emptyText: TextStyle;
+  createdDateContainer: ViewStyle;
+  dateItem: ViewStyle;
+  createdDateText: TextStyle;
+  cardDate: TextStyle;
+  modalOverlay: ViewStyle;
+  modalContent: ViewStyle;
+  modalHeader: ViewStyle;
+  modalTitle: TextStyle;
+  modalInput: TextStyle;
+  modalButtons: ViewStyle;
+  modalButton: ViewStyle;
+  modalButtonText: TextStyle;
+  celebrationContainer: ViewStyle;
+  celebrationText: TextStyle;
+  celebrateAgainButton: ViewStyle;
+  celebrateAgainText: TextStyle;
+  confettiOverlay: ViewStyle;
+  completedStatus: ViewStyle;
+  completedText: TextStyle;
+}
+
+export const styles = StyleSheet.create<Styles>({
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6', // bg-gray-100
@@ -42,6 +140,11 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     flex: 1,
     fontFamily: 'Roboto',
+  },
+  placeholderImage: {
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   main: {
     flex: 1,
@@ -123,17 +226,20 @@ export const styles = StyleSheet.create({
   amountContainerCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cardAmount: {
     fontSize: 14,
     color: COLORS.primary,
     fontWeight: '500',
+    textAlign: 'center',
   },
   cardTargetAmount: {
     fontSize: 12,
     color: '#6B7280',
     fontWeight: '400',
     marginLeft: 4,
+    textAlign: 'center',
   },
   avatarContainer: {
     flexDirection: 'row',
@@ -150,8 +256,7 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
-  },
+  } as ImageStyle,
   detailContainer: {
     flex: 1,
     backgroundColor: '#F0EFEE', // bg-[#f0efee]
@@ -235,9 +340,10 @@ export const styles = StyleSheet.create({
     marginBottom: 4,
   },
   fundBalanceAmount: {
-    fontSize: 16, // Giảm font size
-    color: '#111827',
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333333',
+    textAlign: 'center',
   },
   fundDescription: {
     fontSize: 12,
@@ -394,23 +500,21 @@ export const styles = StyleSheet.create({
   },
   amountContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    backgroundColor: '#F9FAFB',
-    padding: 12, // Giảm padding
-    borderRadius: 12,
+    marginVertical: 16,
   },
   amountBox: {
     flex: 1,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginHorizontal: 4,
     alignItems: 'center',
-    paddingHorizontal: 4, // Giảm padding
   },
   amountLabel: {
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-    fontWeight: '500',
+    color: '#666666',
+    marginBottom: 4,
+    textAlign: 'center',
   },
   amountInput: {
     width: '100%',
@@ -638,5 +742,19 @@ export const styles = StyleSheet.create({
     bottom: 0,
     pointerEvents: 'none',
     zIndex: 1000,
+  },
+  completedStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  completedText: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+    marginLeft: 4,
+    fontSize: 12,
   },
 });
