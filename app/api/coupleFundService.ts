@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Custom error class
 class ApiError extends Error {
@@ -13,8 +14,9 @@ class ApiError extends Error {
   }
 }
 
+
 // Get the API URL from environment variables
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:5000';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://192.168.1.2:5000';
 
 // Determine if running in development mode
 const isDev = __DEV__;
@@ -24,11 +26,9 @@ const getBaseUrl = () => {
   if (Platform.OS === 'web') {
     return isDev ? '/api' : '/api';
   } else if (Platform.OS === 'android') {
-    return isDev ? 'http://10.0.2.2:5000/api' : API_URL + '/api';
+    return isDev ? 'http://192.168.1.2:5000/api' : API_URL + '/api';
   } else if (Platform.OS === 'ios') {
-    return isDev && !Platform.isPad && !Platform.isTV
-      ? 'http://localhost:5000/api'
-      : API_URL + '/api';
+    return isDev ? 'http://192.168.1.2:5000/api' : API_URL + '/api';
   }
   return API_URL + '/api';
 };
@@ -39,8 +39,25 @@ console.log('Using API URL:', API_BASE_URL);
 // Create axios instance with timeout and better error handling
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30 seconds timeout
+  timeout: 60000, // Increase timeout to 60 seconds
+  headers: {
+    'Content-Type': 'application/json',
+    'user-id': 'default_user' // Default user ID
+  }
 });
+
+// Add custom retry configuration
+apiClient.defaults.maxRetries = 3;
+apiClient.defaults.retryDelay = 1000;
+
+// Extend AxiosRequestConfig type
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    maxRetries?: number;
+    retryCount?: number;
+    retryDelay?: number;
+  }
+}
 
 // Custom error types
 export const API_ERROR_TYPES = {
@@ -51,10 +68,19 @@ export const API_ERROR_TYPES = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',
 };
 
-// Add request interceptor for logging
+// Add request interceptor to include user-id from AsyncStorage
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        config.headers['user-id'] = userId;
+      }
+    } catch (error) {
+      console.error('Error getting userId from AsyncStorage:', error);
+    }
     console.log(`Making ${config.method?.toUpperCase()} request to: ${config.baseURL}${config.url}`);
+    console.log('Request headers:', config.headers);
     return config;
   },
   (error) => {
@@ -94,6 +120,27 @@ apiClient.interceptors.response.use(
     return Promise.reject(apiError);
   }
 );
+
+// Add retry interceptor
+apiClient.interceptors.response.use(undefined, async (err) => {
+  const { config } = err;
+  if (!config || !config.maxRetries) return Promise.reject(err);
+
+  config.retryCount = config.retryCount || 0;
+  
+  if (config.retryCount >= config.maxRetries) {
+    return Promise.reject(err);
+  }
+  
+  config.retryCount += 1;
+  console.log(`Retrying request (${config.retryCount}/${config.maxRetries})...`);
+  
+  // Delay before retrying
+  const delayMs = config.retryDelay || 1000;
+  await new Promise(resolve => setTimeout(resolve, delayMs));
+  
+  return apiClient(config);
+});
 
 // Interface definitions
 export interface Partner {
@@ -152,10 +199,116 @@ interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+  timestamp?: string;
 }
 
-// Couple Fund service API functions
-export const coupleFundService = {
+// Add sync timestamp to interface
+interface SyncInfo {
+  lastSync: string;
+  userId: string;
+}
+
+// Add sync info storage key
+const SYNC_INFO_KEY = 'couple_funds_sync_info';
+
+// Modified service with sync handling
+const coupleFundService = {
+  // Get sync info
+  getSyncInfo: async (): Promise<SyncInfo | null> => {
+    try {
+      const syncInfo = await AsyncStorage.getItem(SYNC_INFO_KEY);
+      return syncInfo ? JSON.parse(syncInfo) : null;
+    } catch (error) {
+      console.error('Error getting sync info:', error);
+      return null;
+    }
+  },
+
+  // Save sync info
+  saveSyncInfo: async (syncInfo: SyncInfo) => {
+    try {
+      await AsyncStorage.setItem(SYNC_INFO_KEY, JSON.stringify(syncInfo));
+    } catch (error) {
+      console.error('Error saving sync info:', error);
+    }
+  },
+
+  // Get all funds with sync
+  getAllFunds: async (): Promise<CoupleFund[]> => {
+    try {
+      console.log('Fetching funds with sync...');
+      const userId = await AsyncStorage.getItem('userId') || 'default_user';
+      
+      // Get last sync info
+      const syncInfo = await coupleFundService.getSyncInfo();
+      console.log('Last sync info:', syncInfo);
+
+      const response = await apiClient.get<ApiResponse<CoupleFund[]>>('/couple-fund', {
+        headers: {
+          'user-id': userId,
+          'last-sync': syncInfo?.lastSync || ''
+        }
+      });
+
+      if (response.data.success) {
+        const funds = response.data.data;
+        console.log('Received', funds.length, 'funds from server');
+
+        // Save sync info
+        await coupleFundService.saveSyncInfo({
+          lastSync: response.data.timestamp || new Date().toISOString(),
+          userId
+        });
+
+        // Save to local storage
+        await AsyncStorage.setItem(SYNC_INFO_KEY, JSON.stringify({
+          lastSync: response.data.timestamp || new Date().toISOString(),
+          userId
+        }));
+        
+        return funds;
+      }
+      
+      throw new Error('Failed to fetch funds');
+    } catch (error) {
+      console.error('Error fetching funds:', error);
+      throw error;
+    }
+  },
+
+  // Update fund with sync
+  updateFund: async (id: string, fundData: Partial<CoupleFund>): Promise<CoupleFund> => {
+    try {
+      const userId = await AsyncStorage.getItem('userId') || 'default_user';
+      const response = await apiClient.put<ApiResponse<CoupleFund>>('/couple-fund', 
+        { id, ...fundData },
+        { headers: { 'user-id': userId } }
+      );
+
+      if (response.data.success) {
+        const updatedFund = response.data.data;
+        
+        // Update local storage
+        const storedData = await AsyncStorage.getItem(SYNC_INFO_KEY);
+        if (storedData) {
+          const syncInfo = JSON.parse(storedData);
+          const updatedSyncInfo = {
+            ...syncInfo,
+            lastSync: new Date().toISOString()
+          };
+          await AsyncStorage.setItem(SYNC_INFO_KEY, JSON.stringify(updatedSyncInfo));
+        }
+
+        return updatedFund;
+      }
+      
+      throw new Error('Failed to update fund');
+    } catch (error) {
+      console.error('Error updating fund:', error);
+      throw error;
+    }
+  },
+
   // Get fund data
   getFund: async (): Promise<CoupleFund> => {
     try {
@@ -172,23 +325,6 @@ export const coupleFundService = {
       return response.data.data;
     } catch (error) {
       console.error('Error fetching couple fund:', error);
-      throw error;
-    }
-  },
-  
-  // Update fund details
-  updateFund: async (fundData: Partial<CoupleFund>): Promise<CoupleFund> => {
-    try {
-      console.log('Updating couple fund:', fundData);
-      const response = await apiClient.put<ApiResponse<CoupleFund>>('/couple-fund', fundData);
-      
-      if (!response.data.success) {
-        throw new ApiError(response.data.message || 'Failed to update couple fund', API_ERROR_TYPES.SERVER_ERROR);
-      }
-      
-      return response.data.data;
-    } catch (error) {
-      console.error('Error updating couple fund:', error);
       throw error;
     }
   },

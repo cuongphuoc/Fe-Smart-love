@@ -16,6 +16,7 @@ import {
   Dimensions,
   Platform,
   StyleSheet,
+  AppState,
 } from 'react-native';
 import { FontAwesome5, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,8 +32,8 @@ import { useNavigation } from '@react-navigation/native';
 
 // Constants
 const API_BASE_URL = Platform.OS === 'android' 
-  ? 'http://10.0.2.2:5000/api/couple-fund'  // Android emulator needs 10.0.2.2
-  : 'http://localhost:5000/api/couple-fund'; // iOS can use localhost
+  ? 'http://192.168.1.2:5000/api/couple-fund'  // Use computer's IP address
+  : 'http://192.168.1.2:5000/api/couple-fund'; // Use computer's IP address for iOS too
 const STORAGE_KEY = 'couple_funds_data';
 const MAX_FUNDS = 20; // Allow up to 20 funds
 const { width } = Dimensions.get('window');
@@ -420,18 +421,51 @@ const CoupleFundScreen: React.FC = () => {
 
   const navigation = useNavigation();
 
+  // Add refreshing state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Add onRefresh handler
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadFundsData();
+    } catch (error) {
+      console.error('Error refreshing funds:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
   // Effects
   useEffect(() => {
+    // Initial load
     loadFundsData();
 
-    // Also reload funds data when the tab is focused
-    const unsubscribe = navigation?.addListener('focus', () => {
+    // Set up auto-sync interval (every 30 seconds)
+    const syncInterval = setInterval(() => {
+      console.log('Auto-syncing funds...');
+      loadFundsData();
+    }, 30000);
+
+    // Set up focus listener for tab navigation
+    const unsubscribeFocus = navigation?.addListener('focus', () => {
       console.log('CoupleFund tab focused, reloading data');
       loadFundsData();
     });
 
+    // Set up app state listener for background/foreground transitions
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        console.log('App came to foreground, syncing data...');
+        loadFundsData();
+      }
+    });
+
+    // Cleanup
     return () => {
-      if (unsubscribe) unsubscribe();
+      clearInterval(syncInterval);
+      if (unsubscribeFocus) unsubscribeFocus();
+      subscription.remove();
     };
   }, []);
 
@@ -501,62 +535,61 @@ const CoupleFundScreen: React.FC = () => {
     checkFundsCompletion();
   }, [funds, notificationsPermission, notifiedFunds]);
 
-  // Modified handlers to use API instead of AsyncStorage
+  // Modified loadFundsData function to handle synchronization better
   const loadFundsData = async () => {
     console.log('Starting to load funds data');
-    setIsLoading(true);
     
     try {
-      // First try to load from API
+      // Try to get fresh data from API
       console.log('Attempting to load from API');
-      const apiDataPromise = fundService.getAllFunds();
-      
-      // Set a timeout to prevent hanging indefinitely
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('API request timed out')), 8000)
-      );
-      
-      // Race between API call and timeout
-      const apiData: Fund[] = await Promise.race([apiDataPromise, timeoutPromise])
-        .catch(err => {
-          console.error('API request failed or timed out:', err);
-          return [] as Fund[];
-        }) as Fund[];
+      const apiData = await fundService.getAllFunds();
       
       if (apiData && apiData.length > 0) {
         console.log('Successfully loaded data from API, found', apiData.length, 'funds');
         setFunds(apiData);
         
-        // Save API data to local storage as backup
+        // Update local storage with fresh data
         await saveFundsData(apiData);
-        
-        setIsLoading(false);
         return;
       }
+
+      console.log('API returned no data, checking local storage');
       
-      console.log('API returned no data, falling back to local storage');
-      
-      // Fallback to local storage if API fails or returns empty
+      // If API returns no data, try to load from local storage
       const storedData = await AsyncStorage.getItem(STORAGE_KEY);
       if (storedData) {
         console.log('Found data in local storage');
-        try {
-          const localFunds = JSON.parse(storedData) as Fund[];
-          setFunds(localFunds);
-          console.log('Successfully loaded', localFunds.length, 'funds from local storage');
-        } catch (parseError) {
-          console.error('Error parsing local storage data:', parseError);
-          setFunds([]);
-        }
+        const localFunds = JSON.parse(storedData) as Fund[];
+        setFunds(localFunds);
       } else {
         console.log('No data found in local storage');
         setFunds([]);
       }
     } catch (error) {
       console.error('Error in loadFundsData:', error);
-      setFunds([]);
+      
+      // If API call fails, try to load from local storage
+      try {
+        const storedData = await AsyncStorage.getItem(STORAGE_KEY);
+        if (storedData) {
+          console.log('Loading from local storage after API error');
+          const localFunds = JSON.parse(storedData) as Fund[];
+          setFunds(localFunds);
+        }
+      } catch (storageError) {
+        console.error('Error loading from local storage:', storageError);
+        setFunds([]);
+      }
+
+      // Show error only if it's a network error
+      if (axios.isAxiosError(error)) {
+        Alert.alert(
+          'Connection Error',
+          'Could not connect to server. Please check your connection and try again.',
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
-      console.log('Finished loading funds data, setting isLoading to false');
       setIsLoading(false);
     }
   };
@@ -1251,14 +1284,16 @@ const CoupleFundScreen: React.FC = () => {
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.cardList, { paddingBottom: insets.bottom + 70 }]}
           showsVerticalScrollIndicator={true}
-          bounces={false}
-          overScrollMode="never"
+          bounces={true}
+          overScrollMode="always"
           removeClippedSubviews={true}
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={5}
           ListEmptyComponent={renderEmptyList}
           ListFooterComponent={<View style={{ height: 80 }} />}
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
         />
       </View>
     </SafeAreaView>

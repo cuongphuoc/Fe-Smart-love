@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 // Your computer's IP address on your local network
 // IMPORTANT: Change this to your computer's actual IP address
-const YOUR_IP_ADDRESS = '192.168.1.6'; // Example: '192.168.0.105'
+const YOUR_IP_ADDRESS = '192.168.1.2'; // Your computer's IP address
 
 // Determine if running in development mode
 const isDev = __DEV__;
@@ -23,22 +23,9 @@ const getBaseUrl = () => {
       // For production web builds, you might use a different URL
       return '/api';
     }
-  } else if (Platform.OS === 'android') {
-    if (isDev) {
-      // Use 10.0.2.2 for Android Emulator to connect to localhost
-      return 'http://10.0.2.2:5000/api';
-    } else {
-      // For physical Android devices, use your computer's actual IP address
-      return `http://${YOUR_IP_ADDRESS}:5000/api`;
-    }
-  } else if (Platform.OS === 'ios') {
-    if (isDev && !Platform.isPad && !Platform.isTV) {
-      // For iOS simulator
-      return 'http://localhost:5000/api';
-    } else {
-      // For physical iOS devices
-      return `http://${YOUR_IP_ADDRESS}:5000/api`;
-    }
+  } else if (Platform.OS === 'android' || Platform.OS === 'ios') {
+    // Use the same IP address for both Android and iOS
+    return `http://${YOUR_IP_ADDRESS}:5000/api`;
   } else {
     // Default fallback
     return `http://${YOUR_IP_ADDRESS}:5000/api`;

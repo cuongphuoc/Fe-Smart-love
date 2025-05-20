@@ -15,43 +15,33 @@ const getCoupleFund = async (req, res) => {
     }
 
     // Find all funds for the user
-    const funds = await CoupleFund.find({ userId });
+    const funds = await CoupleFund.find({ userId }).sort({ updatedAt: -1 });
     
     console.log('[DEBUG] Số lượng funds tìm thấy:', funds.length);
     
-    // Get the server's base URL for image paths
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    console.log('[DEBUG] Server base URL:', baseUrl);
-    
-    // Process images to full URLs for the response
+    // Process funds without image processing
     const processedFunds = funds.map(fund => {
       const fundObj = fund.toObject();
       
-      // Convert image paths to full URLs
-      if (fundObj.image) {
-        // Make sure image URL is absolute
-        if (!fundObj.image.startsWith('http')) {
-          const imagePath = fundObj.image.startsWith('/') ? fundObj.image : `/${fundObj.image}`;
-          fundObj.image = `${baseUrl}${imagePath}`;
-        }
-      }
-      
-      if (fundObj.avatarUrls && fundObj.avatarUrls.length > 0) {
-        fundObj.avatarUrls = fundObj.avatarUrls.map(avatar => {
-          if (avatar && !avatar.startsWith('http')) {
-            const avatarPath = avatar.startsWith('/') ? avatar : `/${avatar}`;
-            return `${baseUrl}${avatarPath}`;
-          }
-          return avatar;
-        });
-      }
-      
-      return fundObj;
+      // Keep only essential data
+      return {
+        _id: fundObj._id,
+        name: fundObj.name,
+        description: fundObj.description,
+        balance: fundObj.balance,
+        goal: fundObj.goal,
+        partners: fundObj.partners,
+        transactions: fundObj.transactions,
+        createdAt: fundObj.createdAt,
+        updatedAt: fundObj.updatedAt,
+        lastSync: new Date().toISOString() // Add sync timestamp
+      };
     });
     
     res.json({
       success: true,
-      data: processedFunds
+      data: processedFunds,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Error getting couple funds:', error);
