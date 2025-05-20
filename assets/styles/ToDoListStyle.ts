@@ -560,4 +560,17 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     width: '90%',
   },
+  // Loading styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    minHeight: 200,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 10,
+  },
 });

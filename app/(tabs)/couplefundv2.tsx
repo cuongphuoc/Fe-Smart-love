@@ -24,7 +24,6 @@ import { styles } from '../../assets/styles/CoupleFundStyle';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Font from 'expo-font';
 import ConfettiCannon from 'react-native-confetti-cannon';
-import { registerForPushNotificationsAsync, sendFundCompletionNotification } from '../../utils/notifications';
 import axios from 'axios';
 
 // Constants
@@ -41,10 +40,6 @@ interface Fund {
   image: string;
   amount: string;
   targetAmount: string;
-  avatars: string[];
-  altImage: string;
-  altAvatar1: string;
-  altAvatar2: string;
   title: string;
   description: string;
   createdAt: string;
@@ -79,13 +74,6 @@ const fundService = {
           image: fund.image || 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
           amount: formatAmount(fund.balance.toString()),
           targetAmount: formatAmount(fund.goal.amount.toString()),
-          avatars: fund.avatarUrls || [
-            'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
-            'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
-          ],
-          altImage: 'Fund image',
-          altAvatar1: 'Avatar of person 1',
-          altAvatar2: 'Avatar of person 2',
           createdAt: formatDateTime(new Date(fund.createdAt)),
           modifiedAt: fund.updatedAt !== fund.createdAt ? formatDateTime(new Date(fund.updatedAt)) : undefined
         }));
@@ -107,7 +95,6 @@ const fundService = {
         description: fundData.description,
         balance: parseInt(fundData.amount?.replace(/[^\d]/g, '') || '0'),
         image: fundData.image,
-        avatarUrls: fundData.avatars,
         goal: {
           name: fundData.title,
           amount: parseInt(fundData.targetAmount?.replace(/[^\d]/g, '') || '0')
@@ -129,13 +116,6 @@ const fundService = {
           image: data.image || 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
           amount: formatAmount(data.balance.toString()),
           targetAmount: formatAmount(data.goal.amount.toString()),
-          avatars: data.avatarUrls || [
-            'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
-            'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
-          ],
-          altImage: 'Fund image',
-          altAvatar1: 'Avatar of person 1',
-          altAvatar2: 'Avatar of person 2',
           createdAt: formatDateTime(new Date(data.createdAt)),
           modifiedAt: undefined
         };
@@ -420,9 +400,6 @@ const CoupleFundScreen: React.FC = () => {
 
   const [showCelebration, setShowCelebration] = useState(false);
   const confettiRef = useRef<ConfettiCannon>(null);
-  const [notificationsPermission, setNotificationsPermission] = useState(false);
-  const [notifiedFunds, setNotifiedFunds] = useState<string[]>([]);
-
   // Effects
   useEffect(() => {
     loadFundsData();
@@ -445,54 +422,6 @@ const CoupleFundScreen: React.FC = () => {
       }
     }
   }, [selectedFund]);
-
-  // Request notifications permission on mount
-  useEffect(() => {
-    const setupNotifications = async () => {
-      const token = await registerForPushNotificationsAsync();
-      setNotificationsPermission(!!token);
-
-      // Load notified funds from storage
-      try {
-        const storedNotifiedFunds = await AsyncStorage.getItem('notified_funds');
-        if (storedNotifiedFunds) {
-          setNotifiedFunds(JSON.parse(storedNotifiedFunds));
-        }
-      } catch (error) {
-        console.error('Error loading notified funds:', error);
-      }
-    };
-    
-    setupNotifications();
-  }, []);
-  
-  // Check for fund completion and trigger notification
-  useEffect(() => {
-    const checkFundsCompletion = async () => {
-      if (!notificationsPermission) return;
-      
-      const completedFunds = funds.filter(fund => {
-        const progress = calculateProgress(fund.amount, fund.targetAmount);
-        return progress >= 100 && !notifiedFunds.includes(fund.id);
-      });
-      
-      if (completedFunds.length > 0) {
-        const newNotifiedFunds = [...notifiedFunds];
-        
-        for (const fund of completedFunds) {
-          // Send notification for each newly completed fund
-          await sendFundCompletionNotification(fund.title);
-          newNotifiedFunds.push(fund.id);
-        }
-        
-        // Save the updated list of notified funds
-        setNotifiedFunds(newNotifiedFunds);
-        await AsyncStorage.setItem('notified_funds', JSON.stringify(newNotifiedFunds));
-      }
-    };
-    
-    checkFundsCompletion();
-  }, [funds, notificationsPermission, notifiedFunds]);
 
   // Modified handlers to use API instead of AsyncStorage
   const loadFundsData = async () => {
@@ -755,11 +684,11 @@ const CoupleFundScreen: React.FC = () => {
       
       // Check if fund was just completed
       const progress = calculateProgress(formattedCurrentAmount, formattedTargetAmount);
-      if (progress >= 100 && notificationsPermission && !notifiedFunds.includes(updatedFund.id)) {
-        await sendFundCompletionNotification(updatedFund.title);
-        const newNotifiedFunds = [...notifiedFunds, updatedFund.id];
-        setNotifiedFunds(newNotifiedFunds);
-        await AsyncStorage.setItem('notified_funds', JSON.stringify(newNotifiedFunds));
+      if (progress >= 100) {
+        setShowCelebration(true);
+        setTimeout(() => {
+          confettiRef.current?.start();
+        }, 500);
       }
     } catch (error) {
       console.error('Error updating fund:', error);
@@ -825,22 +754,12 @@ const CoupleFundScreen: React.FC = () => {
         <Text style={styles.cardTitle}>{item.title}</Text>
         <Text style={styles.cardDate}>{item.createdAt}</Text>
       </View>
-      <View style={styles.cardFooter}>
-        <View style={styles.amountContainerCard}>
-          <Text style={styles.cardAmount}>{item.amount}</Text>
-          <Text style={styles.cardTargetAmount}>/{item.targetAmount}</Text>
+              <View style={styles.cardFooter}>
+          <View style={styles.amountContainerCard}>
+            <Text style={styles.cardAmount}>{item.amount}</Text>
+            <Text style={styles.cardTargetAmount}>/{item.targetAmount}</Text>
+          </View>
         </View>
-        <View style={styles.avatarContainer}>
-          {item.avatars.map((avatar, index) => (
-            <Image
-              key={index}
-              source={{ uri: avatar }}
-              style={styles.avatar}
-              accessibilityLabel={index === 0 ? item.altAvatar1 : item.altAvatar2}
-            />
-          ))}
-        </View>
-      </View>
     </TouchableOpacity>
   );
 
@@ -960,9 +879,9 @@ const CoupleFundScreen: React.FC = () => {
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: selectedImage || selectedFund?.image }}
-            style={styles.backgroundImage}
-            accessibilityLabel={selectedFund?.altImage}
+                    source={{ uri: selectedImage || selectedFund?.image }}
+        style={styles.backgroundImage}
+        accessibilityLabel="Fund image"
           />
           <TouchableOpacity
             style={styles.changePhotoButton}

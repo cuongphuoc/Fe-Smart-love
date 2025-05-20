@@ -14,12 +14,18 @@ import {
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
   Keyboard,
+  GestureResponderEvent,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { styles } from '../../assets/styles/ToDoListStyle';
+import { useTodoTasks, TasksByDate } from '../hooks/useTodoTasks';
+import { Task as ApiTask } from '../api/todoService';
 
 // STORAGE KEY
 const STORAGE_KEY = '@todo_list_data';
@@ -94,9 +100,18 @@ const editDistance = (s1: string, s2: string): number => {
 
 // MAIN COMPONENT
 const TodoListScreen = () => {
-  // STATE MANAGEMENT
-  // Task List
-  const [taskList, setTaskList] = useState<{ date: string; tasks: Task[] }[]>([]);
+  // Use our custom hook to manage tasks with API integration
+  const { 
+    taskList,
+    isLoading, 
+    error, 
+    refreshTasks,
+    addTask,
+    updateTask,
+    deleteTask,
+    deleteTasks,
+    toggleTaskComplete
+  } = useTodoTasks();
   
   // Task Modal
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
@@ -135,48 +150,35 @@ const TodoListScreen = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   
   // Constants
-  const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const daysOfWeek = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const insets = useSafeAreaInsets();
 
-  // Effect: Load data from AsyncStorage
+  // Get screen dimensions for positioning the button
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  
+  // Add Task Button Position - start at bottom right by default
+  const [buttonPosition, setButtonPosition] = useState({ 
+    x: screenWidth - 80, 
+    y: screenHeight - 140 
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const [startTouch, setStartTouch] = useState({ x: 0, y: 0 });
+
+  // Effect: Show error alerts if API operations fail
   useEffect(() => {
-    loadTasksData();
-  }, []);
+    if (error) {
+      Alert.alert('Error', error.message);
+    }
+  }, [error]);
 
-  // Effect: Save data to AsyncStorage whenever taskList changes
+  // Effect for animation
   useEffect(() => {
-    saveTasksData();
-  }, [taskList]);
-
-  // Function: Load tasks from AsyncStorage
-  const loadTasksData = async () => {
-    try {
-      const storedData = await AsyncStorage.getItem(STORAGE_KEY);
-      if (storedData) {
-        const parsedData = JSON.parse(storedData);
-        // Convert string dates back to Date objects
-        const processedData = parsedData.map((section: { date: string; tasks: any[] }) => ({
-          ...section,
-          tasks: section.tasks.map((task: any) => ({
-            ...task,
-            dueDate: new Date(task.dueDate)
-          }))
-        }));
-        setTaskList(processedData);
-      }
-    } catch (error) {
-      console.error('Error loading tasks:', error);
-    }
-  };
-
-  // Function: Save tasks to AsyncStorage
-  const saveTasksData = async () => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(taskList));
-    } catch (error) {
-      console.error('Error saving tasks:', error);
-    }
-  };
+    Animated.timing(fadeAnim, {
+      toValue: isTaskModalVisible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [isTaskModalVisible]);
 
   // Function: Toggle selection mode
   const toggleSelectionMode = () => {
@@ -203,24 +205,31 @@ const TodoListScreen = () => {
 
   // Function: Delete selected tasks
   const deleteSelectedTasks = () => {
-    setTaskList(prev => 
-      prev.map(section => ({
-        ...section,
-        tasks: section.tasks.filter(task => !selectedTasks.includes(task.id))
-      })).filter(section => section.tasks.length > 0)
-    );
-    setSelectedTasks([]);
-    setIsSelectionMode(false);
+    // Call the API service to delete selected tasks
+    deleteTasks(selectedTasks).then(() => {
+      setSelectedTasks([]);
+      setIsSelectionMode(false);
+    }).catch(error => {
+      Alert.alert('Error', 'Failed to delete selected tasks');
+      console.error('Error deleting selected tasks:', error);
+    });
   };
 
-  // Hiệu ứng Animated cho modal
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: isTaskModalVisible ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [isTaskModalVisible]);
+  // Convert API task to local task with Date object
+  const convertApiTaskToLocal = (apiTask: ApiTask): Task => {
+    return {
+      ...apiTask,
+      dueDate: new Date(apiTask.dueDate)
+    };
+  };
+
+  // Convert local task to API format
+  const convertLocalTaskToApi = (localTask: Task): ApiTask => {
+    return {
+      ...localTask,
+      dueDate: localTask.dueDate.toISOString()
+    };
+  };
 
   // Function: Perform search
   const performSearch = () => {
@@ -229,7 +238,10 @@ const TodoListScreen = () => {
       return;
     }
 
-    const allTasks = taskList.flatMap(section => section.tasks);
+    // Collect all tasks from all dates and convert to local Task format
+    const allTasks: Task[] = taskList.flatMap(section => 
+      section.tasks.map(apiTask => convertApiTaskToLocal(apiTask))
+    );
 
     if (searchMode === 'name') {
       if (searchQuery.trim() === '') {
@@ -311,10 +323,12 @@ const TodoListScreen = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
+    // Adjust firstDay to start week on Monday (0 = Monday, 6 = Sunday)
+    const adjustedFirstDay = (firstDay === 0 ? 6 : firstDay - 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const daysInPrevMonth = new Date(year, month, 0).getDate();
     const days = [];
-    for (let i = firstDay - 1; i >= 0; i--) {
+    for (let i = adjustedFirstDay - 1; i >= 0; i--) {
       days.push({ day: daysInPrevMonth - i, month: month - 1, year, isCurrentMonth: false });
     }
     for (let i = 1; i <= daysInMonth; i++) {
@@ -361,53 +375,47 @@ const TodoListScreen = () => {
     setNewTask((prev) => ({ ...prev, dueDate: new Date(year, month, day) }));
   };
 
-  // Hàm: Thêm/chỉnh sửa task
+  // Function: Thêm/chỉnh sửa task
   const handleSaveTaskData = () => {
     if (!newTask.title) return;
-    const taskDate = newTask.dueDate.toISOString().split('T')[0];
+    
     if (isEditMode && selectedTask) {
-      setTaskList((prev) =>
-        prev.map((section) => ({
-          ...section,
-          tasks: section.tasks.map((task) =>
-            task.id === selectedTask.id ? { ...newTask, id: selectedTask.id } : task
-          ),
-        }))
-      );
+      // Update existing task
+      updateTask(selectedTask.id, convertLocalTaskToApi({
+        ...newTask,
+        id: selectedTask.id
+      })).catch(error => {
+        Alert.alert('Error', 'Failed to update task');
+        console.error('Error updating task:', error);
+      });
     } else {
-      const newTaskData: Task = {
-        id: Date.now().toString(),
+      // Add new task
+      // Prepare the task for API with an ISO date string
+      const apiTaskData = {
         title: newTask.title,
         completed: false,
-        dueDate: newTask.dueDate,
+        dueDate: newTask.dueDate.toISOString()
       };
-      setTaskList((prev) => {
-        const existingSection = prev.find((section) => section.date === taskDate);
-        if (existingSection) {
-          return prev.map((section) =>
-            section.date === taskDate
-              ? { ...section, tasks: [...section.tasks, newTaskData] }
-              : section
-          );
-        }
-        return [...prev, { date: taskDate, tasks: [newTaskData] }];
+      
+      // Call the addTask API
+      addTask(apiTaskData).catch(error => {
+        Alert.alert('Error', 'Failed to add task');
+        console.error('Error adding task:', error);
       });
     }
+    
+    // Reset form and close modal
     setNewTask({ id: '', title: '', completed: false, dueDate: new Date() });
     setIsTaskModalVisible(false);
     setIsEditMode(false);
   };
 
-  // Hàm: Toggle trạng thái hoàn thành
+  // Function: Toggle task completion status
   const handleToggleTaskComplete = (id: string) => {
-    setTaskList((prev) =>
-      prev.map((section) => ({
-        ...section,
-        tasks: section.tasks.map((task) =>
-          task.id === id ? { ...task, completed: !task.completed } : task
-        ),
-      }))
-    );
+    toggleTaskComplete(id).catch(error => {
+      Alert.alert('Error', 'Failed to update task status');
+      console.error('Error toggling task completion:', error);
+    });
   };
 
   // Hàm: Xử lý nhấn nút tùy chọn
@@ -425,16 +433,18 @@ const TodoListScreen = () => {
     setIsContextMenuVisible(true);
   };
 
-  // Hàm: Xóa task
+  // Function: Delete a single task
   const handleDeleteSingleTask = () => {
     if (!selectedTask) return;
-    setTaskList((prev) =>
-      prev.map((section) => ({
-        ...section,
-        tasks: section.tasks.filter((task) => task.id !== selectedTask.id),
-      })).filter((section) => section.tasks.length > 0)
-    );
-    setIsContextMenuVisible(false);
+    
+    deleteTask(selectedTask.id)
+      .then(() => {
+        setIsContextMenuVisible(false);
+      })
+      .catch(error => {
+        Alert.alert('Error', 'Failed to delete task');
+        console.error('Error deleting task:', error);
+      });
   };
 
   // Hàm: Xử lý thay đổi ngày/giờ
@@ -451,6 +461,56 @@ const TodoListScreen = () => {
     newDate.setHours(selected.getHours());
     newDate.setMinutes(selected.getMinutes());
     setNewTask(prev => ({ ...prev, dueDate: newDate }));
+  };
+
+  // Handle button touch start
+  const handleButtonTouchStart = (event: GestureResponderEvent) => {
+    // Only start dragging when the press lasts a moment
+    setStartTouch({
+      x: event.nativeEvent.pageX,
+      y: event.nativeEvent.pageY
+    });
+    // Don't set isDragging immediately to allow for taps
+    setTimeout(() => {
+      setIsDragging(true);
+    }, 100);
+  };
+
+  // Handle button drag
+  const handleButtonTouchMove = (event: GestureResponderEvent) => {
+    if (isDragging) {
+      // Calculate new position based on finger movement
+      const offsetX = event.nativeEvent.pageX - startTouch.x;
+      const offsetY = event.nativeEvent.pageY - startTouch.y;
+      
+      // Update touch start for smoother movement
+      setStartTouch({
+        x: event.nativeEvent.pageX,
+        y: event.nativeEvent.pageY
+      });
+      
+      // Calculate new position, applying constraints
+      const newX = Math.max(0, Math.min(
+        screenWidth - 60, 
+        buttonPosition.x + offsetX
+      ));
+      
+      const newY = Math.max(insets.top, Math.min(
+        screenHeight - 120, 
+        buttonPosition.y + offsetY
+      ));
+      
+      setButtonPosition({ x: newX, y: newY });
+    }
+  };
+
+  // Handle button touch end
+  const handleButtonTouchEnd = (event: GestureResponderEvent) => {
+    // If the drag was very short in duration and distance, treat it as a tap
+    const wasDragging = isDragging;
+    setIsDragging(false);
+    
+    return !wasDragging; // Return true to allow the button press to propagate
   };
 
   // Render lịch
@@ -624,7 +684,18 @@ const TodoListScreen = () => {
             style={styles.contentContainer}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 100 }}
+            refreshControl={
+              <RefreshControl refreshing={isLoading} onRefresh={refreshTasks} />
+            }
           >
+            {/* Loading Indicator */}
+            {isLoading && taskList.length === 0 && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#f03a6c" />
+                <Text style={styles.loadingText}>Loading tasks...</Text>
+              </View>
+            )}
+
             {/* Search Results Section */}
             {isSearchVisible && searchResults.length > 0 && (
               <View style={styles.taskSectionContainer}>
@@ -678,7 +749,7 @@ const TodoListScreen = () => {
               (searchMode === 'name' && searchQuery.trim() === '') || 
               (searchMode === 'date' && !searchDate)) && (
               <>
-                {taskList.length === 0 ? (
+                {taskList.length === 0 && !isLoading ? (
                   <Text style={styles.emptyListText}>
                     No tasks yet. Add some!
                   </Text>
@@ -690,11 +761,14 @@ const TodoListScreen = () => {
                       taskList.map((section) => {
                         if (section.tasks.length === 0) return null;
                         
+                        // Convert API tasks to local tasks with Date objects
+                        const localTasks = section.tasks.map(task => convertApiTaskToLocal(task));
+                        
                         return (
                           <View key={`all-${section.date}`} style={styles.taskSectionContainer}>
                             <Text style={styles.taskSectionTitle}>{formatDate(new Date(section.date))}</Text>
                             <FlatList
-                              data={section.tasks}
+                              data={localTasks}
                               keyExtractor={(item) => item.id}
                               renderItem={({ item }) => (
                                 <TaskItem
@@ -715,7 +789,10 @@ const TodoListScreen = () => {
                     ) : activeTab === 'ongoing' ? (
                       // Tab "On going"
                       taskList.map((section) => {
-                        const pendingTasks = section.tasks.filter(task => !task.completed);
+                        // Convert API tasks to local tasks with Date objects and filter for pending tasks
+                        const localTasks = section.tasks.map(task => convertApiTaskToLocal(task));
+                        const pendingTasks = localTasks.filter(task => !task.completed);
+                        
                         if (pendingTasks.length === 0) return null;
                         
                         return (
@@ -743,7 +820,10 @@ const TodoListScreen = () => {
                     ) : (
                       // Tab "Done"
                       taskList.map((section) => {
-                        const completedTasks = section.tasks.filter(task => task.completed);
+                        // Convert API tasks to local tasks with Date objects and filter for completed tasks
+                        const localTasks = section.tasks.map(task => convertApiTaskToLocal(task));
+                        const completedTasks = localTasks.filter(task => task.completed);
+                        
                         if (completedTasks.length === 0) return null;
                         
                         return (
@@ -778,16 +858,34 @@ const TodoListScreen = () => {
       </KeyboardAvoidingView>
 
       {/* Add Task Button */}
-      <TouchableOpacity
-        style={styles.addTaskButton}
-        onPress={() => {
-          setNewTask({ id: '', title: '', completed: false, dueDate: new Date() });
-          setIsTaskModalVisible(true);
-          setIsEditMode(false);
+      <View 
+        style={{
+          position: 'absolute',
+          top: buttonPosition.y, 
+          left: buttonPosition.x,
+          width: 60,
+          height: 60,
+          zIndex: 999,
         }}
+        onTouchStart={handleButtonTouchStart}
+        onTouchEnd={handleButtonTouchEnd}
+        onTouchMove={handleButtonTouchMove}
       >
-        <Text style={styles.addTaskButtonText}>+</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.addTaskButton, { position: 'relative', top: 0, right: 0 }]}
+          onPress={() => {
+            // Only open modal if we weren't dragging
+            if (!isDragging) {
+              setNewTask({ id: '', title: '', completed: false, dueDate: new Date() });
+              setIsTaskModalVisible(true);
+              setIsEditMode(false);
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.addTaskButtonText}>+</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Context Menu Modal */}
       <Modal
