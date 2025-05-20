@@ -1,11 +1,11 @@
 const CoupleFund = require('../models/coupleFund');
-const { saveBase64Image, getImageUrl } = require('../utils/imageHelper');
+const { saveBase64Image, getImageUrl, deleteImage } = require('../utils/imageHelper');
 
 // Get all couple funds for a user
 const getCoupleFund = async (req, res) => {
   try {
     console.log('[DEBUG] Đang lấy couple funds...');
-    const userId = req.headers['user-id']; // Get userId from request headers
+    const userId = req.headers['user-id'];
     
     if (!userId) {
       return res.status(400).json({
@@ -19,22 +19,24 @@ const getCoupleFund = async (req, res) => {
     
     console.log('[DEBUG] Số lượng funds tìm thấy:', funds.length);
     
-    // Process funds without image processing
+    // Process funds and convert image paths to full URLs
     const processedFunds = funds.map(fund => {
       const fundObj = fund.toObject();
       
-      // Keep only essential data
+      // Convert image paths to full URLs
+      if (fundObj.image) {
+        fundObj.image = getImageUrl(req, fundObj.image);
+      }
+      
+      if (fundObj.avatarUrls && fundObj.avatarUrls.length > 0) {
+        fundObj.avatarUrls = fundObj.avatarUrls.map(avatar => 
+          avatar ? getImageUrl(req, avatar) : null
+        );
+      }
+      
       return {
-        _id: fundObj._id,
-        name: fundObj.name,
-        description: fundObj.description,
-        balance: fundObj.balance,
-        goal: fundObj.goal,
-        partners: fundObj.partners,
-        transactions: fundObj.transactions,
-        createdAt: fundObj.createdAt,
-        updatedAt: fundObj.updatedAt,
-        lastSync: new Date().toISOString() // Add sync timestamp
+        ...fundObj,
+        lastSync: new Date().toISOString()
       };
     });
     
@@ -57,7 +59,7 @@ const getCoupleFund = async (req, res) => {
 const updateCoupleFund = async (req, res) => {
   try {
     console.log('[DEBUG] Đang cập nhật couple fund với dữ liệu:', req.body);
-    const userId = req.headers['user-id']; // Get userId from request headers
+    const userId = req.headers['user-id'];
     const { 
       id, 
       name, 
@@ -77,26 +79,7 @@ const updateCoupleFund = async (req, res) => {
     }
 
     let fund;
-    
-    // Process any images that might be in base64 format
-    let processedImage = image;
-    let processedAvatars = avatarUrls;
-    
-    // Only process image if it's a base64 string
-    if (image && typeof image === 'string' && image.startsWith('data:image')) {
-      processedImage = saveBase64Image(image, 'funds');
-      console.log('[DEBUG] Saved fund image:', processedImage);
-    }
-    
-    // Process avatar images
-    if (avatarUrls && Array.isArray(avatarUrls)) {
-      processedAvatars = avatarUrls.map((avatar, index) => {
-        if (avatar && typeof avatar === 'string' && avatar.startsWith('data:image')) {
-          return saveBase64Image(avatar, 'avatars');
-        }
-        return avatar;
-      });
-    }
+    let oldImage = null;
     
     if (id) {
       // Update existing fund
@@ -109,47 +92,14 @@ const updateCoupleFund = async (req, res) => {
         });
       }
       
-      // Update fund details
-      if (name) fund.name = name;
-      if (description) fund.description = description;
-      if (processedImage) fund.image = processedImage;
-      if (processedAvatars && processedAvatars.length > 0) fund.avatarUrls = processedAvatars;
-      if (goal) fund.goal = { ...fund.goal, ...goal };
-      
-      // Handle balance update through a transaction
-      if (typeof balance !== 'undefined') {
-        const currentBalance = fund.balance || 0;
-        const newBalance = parseInt(balance);
-        
-        if (newBalance !== currentBalance) {
-          // Create a transaction for the balance difference
-          const difference = newBalance - currentBalance;
-          const transactionType = difference > 0 ? 'deposit' : 'withdraw';
-          
-          // Add transaction record
-          fund.transactions.push({
-            amount: Math.abs(difference),
-            type: transactionType,
-            category: transactionType === 'deposit' ? 'Income' : 'Expense',
-            description: `${transactionType === 'deposit' ? 'Added' : 'Withdrew'} ${Math.abs(difference)}đ`,
-            date: new Date(),
-            createdBy: 'User'
-          });
-          
-          // Update balance
-          fund.balance = newBalance;
-        }
-      }
-      
-      if (partners) fund.partners = partners;
+      // Store old image path for deletion if needed
+      oldImage = fund.image;
     } else {
       // Create new fund
       fund = new CoupleFund({
         userId,
         name: name || 'Our Fund',
         description: description || "Let's create goals and make dreams come true",
-        image: processedImage,
-        avatarUrls: processedAvatars || [],
         balance: balance || 0,
         partners: partners || [],
         goal: goal || {},
@@ -159,36 +109,77 @@ const updateCoupleFund = async (req, res) => {
       });
     }
     
+    // Process new image if provided
+    if (image && image !== oldImage) {
+      if (typeof image === 'string' && image.startsWith('data:image')) {
+        // Delete old image if exists
+        if (oldImage) {
+          deleteImage(oldImage);
+        }
+        // Save new image
+        const savedImagePath = saveBase64Image(image, 'funds');
+        fund.image = savedImagePath;
+      } else if (!image.startsWith('data:image')) {
+        // If not base64, assume it's a URL and use as is
+        fund.image = image;
+      }
+    }
+    
+    // Process avatar images if provided
+    if (avatarUrls && Array.isArray(avatarUrls)) {
+      const processedAvatars = await Promise.all(avatarUrls.map(async (avatar) => {
+        if (avatar && typeof avatar === 'string' && avatar.startsWith('data:image')) {
+          return saveBase64Image(avatar, 'avatars');
+        }
+        return avatar;
+      }));
+      fund.avatarUrls = processedAvatars;
+    }
+    
+    // Update other fund details
+    if (name) fund.name = name;
+    if (description) fund.description = description;
+    if (goal) fund.goal = { ...fund.goal, ...goal };
+    if (partners) fund.partners = partners;
+    
+    // Handle balance update through a transaction
+    if (typeof balance !== 'undefined') {
+      const currentBalance = fund.balance || 0;
+      const newBalance = parseInt(balance);
+      
+      if (newBalance !== currentBalance) {
+        const difference = newBalance - currentBalance;
+        const transactionType = difference > 0 ? 'deposit' : 'withdraw';
+        
+        fund.transactions.push({
+          amount: Math.abs(difference),
+          type: transactionType,
+          category: transactionType === 'deposit' ? 'Income' : 'Expense',
+          description: `${transactionType === 'deposit' ? 'Added' : 'Withdrew'} ${Math.abs(difference)}đ`,
+          date: new Date(),
+          createdBy: 'User'
+        });
+        
+        fund.balance = newBalance;
+      }
+    }
+    
     // Save to database
     await fund.save();
     console.log('[DEBUG] Đã lưu fund vào database');
     
-    // Get the server's base URL for image paths
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    console.log('[DEBUG] Server base URL:', baseUrl);
-    
     // Convert saved fund to response object with full image URLs
     const fundObj = fund.toObject();
     
-    // Convert image paths to full URLs for response
+    // Convert image paths to full URLs
     if (fundObj.image) {
-      // Make sure image URL is absolute
-      if (!fundObj.image.startsWith('http')) {
-        const imagePath = fundObj.image.startsWith('/') ? fundObj.image : `/${fundObj.image}`;
-        fundObj.image = `${baseUrl}${imagePath}`;
-      }
-      console.log('[DEBUG] Image URL:', fundObj.image);
+      fundObj.image = getImageUrl(req, fundObj.image);
     }
     
     if (fundObj.avatarUrls && fundObj.avatarUrls.length > 0) {
-      fundObj.avatarUrls = fundObj.avatarUrls.map(avatar => {
-        if (avatar && !avatar.startsWith('http')) {
-          const avatarPath = avatar.startsWith('/') ? avatar : `/${avatar}`;
-          return `${baseUrl}${avatarPath}`;
-        }
-        return avatar;
-      });
-      console.log('[DEBUG] Avatar URLs:', fundObj.avatarUrls);
+      fundObj.avatarUrls = fundObj.avatarUrls.map(avatar => 
+        avatar ? getImageUrl(req, avatar) : null
+      );
     }
     
     res.json({
@@ -470,22 +461,15 @@ const deleteFund = async (req, res) => {
     const userId = req.headers['user-id'];
     const fundId = req.params.id;
     
-    if (!userId) {
+    if (!userId || !fundId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID is required'
+        message: 'User ID and Fund ID are required'
       });
     }
 
-    if (!fundId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Fund ID is required'
-      });
-    }
-
-    // Find and delete the fund
-    const fund = await CoupleFund.findOneAndDelete({ _id: fundId, userId });
+    // Find the fund first to get image paths
+    const fund = await CoupleFund.findOne({ _id: fundId, userId });
     
     if (!fund) {
       return res.status(404).json({
@@ -494,6 +478,20 @@ const deleteFund = async (req, res) => {
       });
     }
 
+    // Delete associated images
+    if (fund.image) {
+      deleteImage(fund.image);
+    }
+    
+    if (fund.avatarUrls && fund.avatarUrls.length > 0) {
+      fund.avatarUrls.forEach(avatar => {
+        if (avatar) deleteImage(avatar);
+      });
+    }
+
+    // Delete the fund
+    await fund.deleteOne();
+    
     console.log('[DEBUG] Successfully deleted fund:', fundId);
     
     res.json({

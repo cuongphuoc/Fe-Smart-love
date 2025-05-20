@@ -14,6 +14,14 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   console.log('Created uploads directory:', UPLOAD_DIR);
 }
 
+// Generate a unique filename based on timestamp and random string
+const generateUniqueFilename = (originalName = '') => {
+  const timestamp = Date.now();
+  const randomString = crypto.randomBytes(8).toString('hex');
+  const extension = originalName.split('.').pop() || 'jpg';
+  return `${timestamp}-${randomString}.${extension}`;
+};
+
 /**
  * Save a base64 image to the local filesystem
  * @param {string} base64Image - The base64 encoded image data
@@ -29,31 +37,26 @@ const saveBase64Image = (base64Image, subdirectory = 'funds') => {
   }
   
   try {
-    // Check if it's a data URI
-    if (base64Image.includes('data:image')) {
-      const matches = base64Image.match(/^data:image\/([A-Za-z]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
-        console.warn('Invalid base64 image format');
-        return base64Image;
-      }
-      
-      const fileType = matches[1];
-      const base64Data = matches[2];
-      const fileName = `${crypto.randomBytes(16).toString('hex')}.${fileType}`;
-      const filePath = path.join(targetDir, fileName);
-      
-      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-      console.log(`Saved image to ${filePath}`);
-      
-      // Return path relative to uploads directory for storage in database
-      return `/uploads/${subdirectory}/${fileName}`;
-    }
+    // Remove the data:image/[type];base64, prefix if present
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
     
-    // Return the original path if not a base64 image
-    return base64Image;
+    // Create buffer from base64
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    // Generate unique filename
+    const filename = generateUniqueFilename();
+    
+    // Create full file path
+    const filePath = path.join(targetDir, filename);
+    
+    // Write file
+    fs.writeFileSync(filePath, imageBuffer);
+    
+    // Return relative path for database storage
+    return `uploads/${subdirectory}/${filename}`;
   } catch (error) {
     console.error('Error saving image:', error);
-    return '';
+    throw new Error('Failed to save image');
   }
 };
 
@@ -63,21 +66,40 @@ const saveBase64Image = (base64Image, subdirectory = 'funds') => {
  * @param {object} req - Express request object
  * @returns {string} - Full URL to the image
  */
-const getImageUrl = (imagePath, req) => {
-  if (!imagePath) return null;
+const getImageUrl = (req, relativePath) => {
+  if (!relativePath) return null;
   
   // If already a full URL, return as is
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
+  if (relativePath.startsWith('http')) {
+    return relativePath;
   }
   
-  // Construct the full URL
+  // Construct full URL
   const baseUrl = `${req.protocol}://${req.get('host')}`;
-  return `${baseUrl}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
+  const imagePath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+  return `${baseUrl}${imagePath}`;
+};
+
+// Delete image file
+const deleteImage = (relativePath) => {
+  try {
+    if (!relativePath) return;
+    
+    // Only delete if it's a local file
+    if (!relativePath.startsWith('http')) {
+      const fullPath = path.join(__dirname, '../..', relativePath);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+    }
+  } catch (error) {
+    console.error('Error deleting image:', error);
+  }
 };
 
 module.exports = {
   saveBase64Image,
   getImageUrl,
+  deleteImage,
   UPLOAD_DIR
 }; 

@@ -629,10 +629,18 @@ const CoupleFundScreen: React.FC = () => {
           
         console.log('Image selected, size:', base64Image.length);
         
-        // First update the UI with local URI for better user experience
-        setSelectedImage(newImageUri);
-        
+        // Cập nhật UI tạm thời chỉ cho fund hiện tại
         if (selectedFund) {
+          // Tạo một bản sao tạm thời của fund được chọn với ảnh mới
+          const updatedSelectedFund = {
+            ...selectedFund,
+            image: newImageUri // Hiển thị ảnh local trước khi upload
+          };
+          
+          // Cập nhật UI cho fund được chọn
+          setSelectedImage(newImageUri);
+          setSelectedFund(updatedSelectedFund);
+          
           try {
             console.log('Updating fund with new image...');
             
@@ -648,22 +656,32 @@ const CoupleFundScreen: React.FC = () => {
             
             console.log('Fund updated with new image:', updatedFund.image);
             
-            // Update local state with server response
+            // Cập nhật state với fund đã cập nhật từ server
             setSelectedFund(updatedFund);
             
+            // Cập nhật mảng funds nhưng chỉ thay đổi fund hiện tại
             const updatedFunds = funds.map(fund => 
               fund.id === selectedFund.id ? updatedFund : fund
             );
+            
             setFunds(updatedFunds);
             await saveFundsData(updatedFunds);
+            
+            // Xóa ảnh tạm sau khi đã cập nhật thành công
+            setSelectedImage(null);
             
             // Alert user of success
             Alert.alert('Success', 'Image updated successfully');
           } catch (error) {
             console.error('Error updating fund image:', error);
             Alert.alert('Error', 'Failed to update fund image. Please try again.');
-            // Reset selected image
-            setSelectedImage(selectedFund.image);
+            
+            // Khôi phục lại ảnh gốc nếu gặp lỗi
+            setSelectedImage(null);
+            setSelectedFund({
+              ...selectedFund,
+              image: selectedFund.image
+            });
           }
         }
       }
@@ -886,16 +904,21 @@ const CoupleFundScreen: React.FC = () => {
     const progress = calculateProgress(item.amount, item.targetAmount);
     const isCompleted = progress >= 100;
     
+    // Đảm bảo sử dụng ảnh riêng của mỗi fund
+    const fundImage = item.image;
+    
     return (
       <TouchableOpacity
         style={styles.card}
         onPress={() => {
+          // Reset selectedImage khi chọn một fund mới để tránh hiển thị ảnh từ fund trước đó
+          setSelectedImage(null);
           setSelectedFund(item);
         }}
       >
-        {item.image ? (
+        {fundImage ? (
           <Image
-            source={{ uri: item.image }}
+            source={{ uri: fundImage }}
             style={styles.cardImage}
             accessibilityLabel={item.altImage}
           />
@@ -1032,6 +1055,10 @@ const CoupleFundScreen: React.FC = () => {
     const progress = calculateProgress(selectedFund.amount, selectedFund.targetAmount);
     const isCompleted = progress >= 100;
     
+    // Sử dụng selectedImage nếu có (ảnh đang được chọn tạm thời) 
+    // hoặc ảnh của fund được chọn
+    const displayImage = selectedImage || selectedFund.image;
+    
     return (
       <SafeAreaView style={styles.detailContainer}>
         <View style={[styles.detailHeader, { paddingTop: insets.top || 12 }]}>
@@ -1064,11 +1091,13 @@ const CoupleFundScreen: React.FC = () => {
 
         <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.imageContainer}>
-            {(selectedImage || selectedFund?.image) ? (
+            {displayImage ? (
               <Image
-                source={{ uri: selectedImage || selectedFund?.image }}
+                source={{ uri: displayImage }}
                 style={styles.backgroundImage}
                 accessibilityLabel={selectedFund?.altImage}
+                // Thêm key để đảm bảo React re-render khi ảnh thay đổi
+                key={displayImage}
               />
             ) : (
               <View style={[styles.backgroundImage, styles.placeholderImage]}>
