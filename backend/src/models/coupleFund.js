@@ -1,31 +1,21 @@
 const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema({
+  type: {
+    type: String,
+    required: true,
+    enum: ['deposit', 'withdraw']
+  },
   amount: {
     type: Number,
     required: true
   },
-  type: {
-    type: String,
-    required: true,
-    enum: ['deposit', 'withdraw', 'expense']
-  },
-  category: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String,
-    default: ''
-  },
+  description: String,
   date: {
     type: Date,
     default: Date.now
   },
-  createdBy: {
-    type: String,
-    required: true
-  }
+  createdBy: String
 });
 
 const coupleFundSchema = new mongoose.Schema({
@@ -36,70 +26,27 @@ const coupleFundSchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    required: true,
-    default: 'Couple Fund'
+    required: true
   },
-  description: {
-    type: String,
-    default: "Let's create goals and make dreams come true"
-  },
-  image: {
-    type: String,
-    default: null
-  },
-  avatarUrls: {
-    type: [String],
-    default: []
-  },
-  altImage: {
-    type: String,
-    default: 'Fund image'
-  },
-  altAvatar1: {
-    type: String,
-    default: 'Avatar of person 1'
-  },
-  altAvatar2: {
-    type: String,
-    default: 'Avatar of person 2'
-  },
+  description: String,
+  image: String,
   balance: {
     type: Number,
-    required: true,
     default: 0
   },
-  partners: [{
-    name: {
-      type: String,
-      required: true
-    },
-    email: {
-      type: String,
-      required: true
-    },
-    contribution: {
-      type: Number,
-      default: 0
-    }
-  }],
-  transactions: [transactionSchema],
   goal: {
-    name: {
-      type: String,
-      default: ''
-    },
+    name: String,
     amount: {
       type: Number,
-      default: 0
-    },
-    deadline: {
-      type: Date
+      required: true
     },
     completed: {
       type: Boolean,
       default: false
     }
   },
+  avatarUrls: [String],
+  transactions: [transactionSchema],
   createdAt: {
     type: Date,
     default: Date.now
@@ -110,12 +57,10 @@ const coupleFundSchema = new mongoose.Schema({
   }
 });
 
-// Update timestamp before saving
+// Update updatedAt on save
 coupleFundSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
+  this.updatedAt = new Date();
   next();
 });
 
-const CoupleFund = mongoose.model('CoupleFund', coupleFundSchema, 'couplefunds');
-
-module.exports = CoupleFund; 
+module.exports = mongoose.model('CoupleFund', coupleFundSchema); 

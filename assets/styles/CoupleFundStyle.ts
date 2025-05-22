@@ -29,6 +29,13 @@ const commonStyles = {
     shadowRadius: 3,
     elevation: 3,
   },
+  modalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
@@ -58,6 +65,13 @@ const commonStyles = {
     color: COLORS.textDark,
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  modalBase: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    width: '100%',
   },
 };
 
@@ -176,9 +190,77 @@ interface Styles {
   amountInputsRow: ViewStyle;
   amountInputWrapper: ViewStyle;
   scrollContentContainer: ViewStyle;
+  transactionContainer: ViewStyle;
+  transactionHeader: ViewStyle;
+  transactionTitle: TextStyle;
+  transactionList: ViewStyle;
+  transactionItem: ViewStyle;
+  transactionInfo: ViewStyle;
+  transactionType: TextStyle;
+  transactionDate: TextStyle;
+  transactionAmount: TextStyle;
+  depositAmount: TextStyle;
+  withdrawAmount: TextStyle;
+  reminderContainer: ViewStyle;
+  reminderHeader: ViewStyle;
+  reminderTitle: TextStyle;
+  reminderList: ViewStyle;
+  reminderItem: ViewStyle;
+  reminderItemHeader: ViewStyle;
+  reminderName: TextStyle;
+  reminderTime: TextStyle;
+  reminderDescription: TextStyle;
+  reminderActions: ViewStyle;
+  reminderActionButton: ViewStyle;
+  reminderActionText: TextStyle;
+  addFundButton: ViewStyle;
+  addFundButtonIcon: TextStyle;
+  settingItem: ViewStyle;
+  settingLabel: TextStyle;
+  authPinInput: TextStyle;
+  transactionDescription: TextStyle;
+  emptyTransactions: ViewStyle;
+  emptyTransactionsText: TextStyle;
+  emptyTransactionsSubText: TextStyle;
+  closeButton: ViewStyle;
+  transactionSummary: ViewStyle;
+  summaryItem: ViewStyle;
+  summaryLabel: TextStyle;
+  summaryValue: TextStyle;
+  summaryDivider: ViewStyle;
+  transactionListHeader: ViewStyle;
+  transactionListTitle: TextStyle;
+  transactionIconContainer: ViewStyle;
+  transactionIcon: ViewStyle;
+  transactionListFooter: ViewStyle;
+  transactionDateHeader: TextStyle;
+  transactionCard: ViewStyle;
+  transactionCardRow: ViewStyle;
+  transactionCardInfo: ViewStyle;
+  transactionCardType: TextStyle;
+  transactionCardDesc: TextStyle;
+  transactionCardAmountBox: ViewStyle;
+  transactionCardAmount: TextStyle;
+  transactionCardTime: TextStyle;
+  actionButtonLarge: ViewStyle;
+  actionButtonLargeText: TextStyle;
+  authModalContainer: ViewStyle;
+  authModalContent: ViewStyle;
+  authTitle: TextStyle;
+  authMessage: TextStyle;
+  pinContainer: ViewStyle;
+  pinInputFocus: ViewStyle;
+  pinInputError: ViewStyle;
+  authButton: ViewStyle;
+  authButtonText: TextStyle;
+  cancelAuthButton: ViewStyle;
+  cancelAuthText: TextStyle;
+  errorText: TextStyle;
+  pinInputContainer: ViewStyle;
+  pinInputLabel: TextStyle;
 }
 
-export const styles = StyleSheet.create<Styles>({
+export const styles = StyleSheet.create<any>({
   // Base container styles
   container: {
     flex: 1,
@@ -465,18 +547,26 @@ export const styles = StyleSheet.create<Styles>({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
+    marginTop: 20,
+    marginBottom: 16,
   },
   optionItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 4,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    marginHorizontal: 4,
+    ...commonStyles.shadow,
   },
   optionText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#E6003F',
+    color: COLORS.textDark,
     textAlign: 'center',
+    lineHeight: 16,
   },
   
   // Bottom nav styles
@@ -504,20 +594,13 @@ export const styles = StyleSheet.create<Styles>({
   // Modal styles
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   popupModalContent: {
-    width: '80%',
-    backgroundColor: COLORS.white,
+    ...commonStyles.modalBase,
     borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    ...commonStyles.modalShadow,
   },
   modalOverlay: {
     flex: 1,
@@ -525,11 +608,9 @@ export const styles = StyleSheet.create<Styles>({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
+    ...commonStyles.modalBase,
+    maxHeight: '90%',
+    ...commonStyles.modalShadow,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -546,15 +627,10 @@ export const styles = StyleSheet.create<Styles>({
     color: COLORS.textDark,
   },
   modalInput: {
-    width: '100%',
+    ...commonStyles.input,
     height: 48,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
     paddingHorizontal: 16,
     marginBottom: 16,
-    fontSize: 16,
-    color: COLORS.textDark,
     backgroundColor: '#F9FAFB',
   },
   modalButtons: {
@@ -579,14 +655,8 @@ export const styles = StyleSheet.create<Styles>({
   
   // Input styles
   input: {
-    width: '100%',
-    height: 40,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 8,
+    ...commonStyles.input,
     marginBottom: 12,
-    backgroundColor: COLORS.lightGray,
   },
   editInputsContainer: {
     paddingHorizontal: 16,
@@ -603,16 +673,11 @@ export const styles = StyleSheet.create<Styles>({
     marginHorizontal: 4,
   },
   amountInput: {
-    width: '100%',
+    ...commonStyles.input,
     height: 48,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    borderRadius: 8,
     paddingHorizontal: 12,
-    fontSize: 16,
     marginBottom: 16,
     backgroundColor: '#F9FAFB',
-    color: COLORS.textDark,
   },
   amountInputContainer: {
     marginBottom: 16,
@@ -868,4 +933,359 @@ export const styles = StyleSheet.create<Styles>({
     marginLeft: 4,
     fontSize: 12,
   },
-});
+  
+  // Transaction history styles
+  transactionContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    ...commonStyles.shadow,
+  },
+  transactionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+    width: '100%',
+  },
+  transactionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textDark,
+  },
+  transactionList: {
+    flex: 1,
+    paddingHorizontal: 16,
+    marginBottom: 0,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEF',
+  },
+  transactionInfo: {
+    flex: 1,
+  },
+  transactionType: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  transactionDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  depositAmount: {
+    color: '#4CAF50',
+  },
+  withdrawAmount: {
+    color: '#DC2626',
+  },
+  emptyTransactions: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+  },
+  emptyTransactionsText: {
+    marginTop: 16,
+    fontSize: 18,
+    color: '#6B7280',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptyTransactionsSubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  closeButton: {
+    padding: 8,
+  },
+  transactionSummary: {
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    marginHorizontal: 16,
+    marginVertical: 16,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  summaryDivider: {
+    width: 1,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 16,
+  },
+  transactionListHeader: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  transactionListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  transactionIconContainer: {
+    paddingRight: 16,
+  },
+  transactionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  transactionListFooter: {
+    height: 24,
+  },
+  transactionDateHeader: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4A5568',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F7FAFC',
+    borderBottomWidth: 1,
+    borderTopWidth: 1,
+    borderColor: '#E2E8F0',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  
+  // Reminder styles
+  reminderContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    ...commonStyles.shadow,
+  },
+  reminderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  reminderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textDark,
+  },
+  reminderList: {
+    marginTop: 8,
+  },
+  reminderItem: {
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  reminderItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  reminderName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textDark,
+  },
+  reminderTime: {
+    fontSize: 12,
+    color: COLORS.textMedium,
+  },
+  reminderDescription: {
+    fontSize: 12,
+    color: COLORS.textMedium,
+    marginBottom: 8,
+  },
+  reminderActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  reminderActionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: COLORS.primary,
+  },
+  reminderActionText: {
+    fontSize: 12,
+    color: COLORS.white,
+    fontWeight: '500',
+  },
+  
+  // Add Fund Button styles
+  addFundButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...commonStyles.shadow,
+  },
+  addFundButtonIcon: {
+    fontSize: 24,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  
+  // Security Settings styles
+  settingItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: COLORS.textDark,
+    flex: 1,
+  },
+  authPinInput: {
+    ...commonStyles.input,
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 16,
+    backgroundColor: '#F9FAFB',
+    height: 56,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  pinInputFocus: {
+    borderColor: COLORS.primary,
+    borderWidth: 2,
+  },
+  pinInputError: {
+    borderColor: '#DC2626',
+    borderWidth: 2,
+    backgroundColor: '#FEF2F2',
+  },
+  authButton: {
+    ...commonStyles.button,
+    backgroundColor: COLORS.primary,
+    marginBottom: 12,
+    height: 48,
+  },
+  authButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cancelAuthButton: {
+    ...commonStyles.button,
+    backgroundColor: 'transparent',
+  },
+  cancelAuthText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.textMedium,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  actionButtonLarge: {
+    ...commonStyles.button,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginHorizontal: 16,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  actionButtonLargeText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  pinInputContainer: {
+    marginBottom: 24,
+  },
+  pinInputLabel: {
+    fontSize: 14,
+    color: COLORS.textDark,
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  authModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 16,
+  },
+  authModalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
+    ...commonStyles.modalShadow,
+  },
+  authTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  authMessage: {
+    fontSize: 16,
+    color: COLORS.textMedium,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+} as unknown as Styles);

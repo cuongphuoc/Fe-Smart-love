@@ -280,10 +280,56 @@ const addTransaction = async (req, res) => {
     const userId = req.headers['user-id'];
     const { fundId, amount, type, category, description, createdBy } = req.body;
     
-    if (!userId || !fundId || !amount || !type || !category || !createdBy) {
+    console.log('[DEBUG] Processing transaction request:', {
+      userId,
+      fundId,
+      amount,
+      type,
+      category,
+      description,
+      createdBy
+    });
+    
+    // Validate required fields
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID, fund ID, amount, type, category, and createdBy are required'
+        message: 'User ID is required',
+        details: { missedField: 'userId' }
+      });
+    }
+    
+    if (!fundId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fund ID is required',
+        details: { missedField: 'fundId' }
+      });
+    }
+    
+    if (!amount && amount !== 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount is required',
+        details: { missedField: 'amount' }
+      });
+    }
+    
+    if (!type) {
+      return res.status(400).json({
+        success: false,
+        message: 'Type is required',
+        details: { missedField: 'type' }
+      });
+    }
+    
+    // Ensure amount is a valid number
+    const transactionAmount = parseInt(amount);
+    if (isNaN(transactionAmount)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid amount format. Must be a number.',
+        details: { invalidField: 'amount', receivedValue: amount }
       });
     }
     
@@ -293,42 +339,61 @@ const addTransaction = async (req, res) => {
     if (!fund) {
       return res.status(404).json({
         success: false,
-        message: 'Fund not found'
+        message: 'Fund not found',
+        details: { fundId, userId }
       });
     }
     
+    console.log('[DEBUG] Found fund:', {
+      fundId: fund._id,
+      name: fund.name,
+      currentBalance: fund.balance
+    });
+    
     // Create new transaction
     const newTransaction = {
-      amount,
+      amount: transactionAmount,
       type,
-      category,
+      category: category || (type === 'deposit' ? 'Income' : 'Expense'),
       description: description || '',
       date: new Date(),
-      createdBy
+      createdBy: createdBy || userId
     };
     
+    console.log('[DEBUG] Created transaction object:', newTransaction);
+    
     // Update balance based on transaction type
+    const previousBalance = fund.balance || 0;
+    
     if (type === 'deposit') {
-      fund.balance += amount;
-      
-      // Update partner contribution
-      const partner = fund.partners.find(p => p.name === createdBy);
-      if (partner) {
-        partner.contribution += amount;
-      }
+      fund.balance = previousBalance + transactionAmount;
     } else if (type === 'withdraw' || type === 'expense') {
-      if (fund.balance < amount) {
+      if (previousBalance < transactionAmount) {
         return res.status(400).json({
           success: false,
-          message: 'Insufficient funds'
+          message: 'Insufficient funds',
+          details: { currentBalance: previousBalance, requestedAmount: transactionAmount }
         });
       }
-      fund.balance -= amount;
+      fund.balance = previousBalance - transactionAmount;
     }
+    
+    console.log('[DEBUG] Updated balance:', {
+      previous: previousBalance,
+      change: type === 'deposit' ? transactionAmount : -transactionAmount,
+      new: fund.balance
+    });
     
     // Add transaction to array
     fund.transactions.push(newTransaction);
-    await fund.save();
+    
+    try {
+      await fund.save();
+      console.log('[DEBUG] Successfully saved fund with new transaction');
+    } catch (saveError) {
+      console.error('[DEBUG] Error saving fund:', saveError);
+      throw saveError;
+    }
     
     // Get the server's base URL for image paths
     const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -360,7 +425,12 @@ const addTransaction = async (req, res) => {
       data: fundObj
     });
   } catch (error) {
-    console.error('Error adding transaction:', error);
+    console.error('[DEBUG] Error adding transaction:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
     res.status(500).json({
       success: false,
       message: 'Failed to add transaction',

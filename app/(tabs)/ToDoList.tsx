@@ -423,7 +423,7 @@ const TodoListScreen = () => {
       updateTask(selectedTask.id, convertLocalTaskToApi({
         ...newTask,
         id: selectedTask.id,
-        deviceId: selectedTask.deviceId || deviceId
+        deviceId: selectedTask.deviceId || deviceId || undefined
       })).catch(error => {
         Alert.alert('Error', 'Failed to update task');
         console.error('Error updating task:', error);

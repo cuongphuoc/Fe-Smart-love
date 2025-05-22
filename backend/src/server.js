@@ -3,9 +3,12 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const schedule = require('node-schedule');
 const connectDB = require('./config/db');
 const taskRoutes = require('./routes/taskRoutes');
 const coupleFundRoutes = require('./routes/coupleFundRoutes');
+const apiRoutes = require('./routes/api');
+const { checkReminders } = require('./controllers/reminderController');
 
 // Load environment variables
 dotenv.config();
@@ -30,6 +33,18 @@ app.use(cors({
 // Middleware for parsing JSON with increased size limit for image uploads
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+  }
+  if (req.headers['user-id']) {
+    console.log('User ID:', req.headers['user-id']);
+  }
+  next();
+});
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -59,10 +74,17 @@ console.log(`Serving static files from: ${uploadsDir}`);
 // Routes
 app.use('/api/tasks', taskRoutes);
 app.use('/api/couple-fund', coupleFundRoutes);
+app.use('/api', apiRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the Smart Love API' });
+});
+
+// Schedule reminder checks every minute
+schedule.scheduleJob('*/1 * * * *', async () => {
+  console.log('Checking reminders...');
+  await checkReminders();
 });
 
 // Error handling middleware

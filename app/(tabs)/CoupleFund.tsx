@@ -22,6 +22,7 @@ import {
   TouchableWithoutFeedback,
   ViewStyle,
   TextStyle,
+  Switch,
 } from 'react-native';
 import { FontAwesome5, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,14 +35,38 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import { registerForPushNotificationsAsync, sendFundCompletionNotification } from '../../utils/notifications';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
+import { 
+  authenticate, 
+  authenticateWithBiometrics, 
+  checkBiometricSupport, 
+  getSecuritySettings, 
+  verifyPin
+} from '../../utils/authentication';
 
 // Constants
 const API_BASE_URL = Platform.OS === 'android' 
-  ? 'http://192.168.1.7:5000/api/couple-fund'  // Use computer's IP address
-  : 'http://192.168.1.7:5000/api/couple-fund'; // Use computer's IP address for iOS too
+  ? 'http://192.168.1.7:5000/api'  // Use computer's IP address
+  : 'http://192.168.1.7:5000/api'; // Use computer's IP address for iOS too
+const COUPLE_FUND_ENDPOINT = `${API_BASE_URL}/couple-fund`;
 const STORAGE_KEY = 'couple_funds_data';
 const MAX_FUNDS = 20; // Allow up to 20 funds
 const { width } = Dimensions.get('window');
+
+// Sử dụng lại COLORS từ file styles
+const COLORS = {
+  primary: '#EE1D52',
+  secondary: '#666666',
+  white: '#FFFFFF',
+  lightGray: '#F3F4F6',
+  darkGray: '#4B5563',
+  background: '#F3F4F6',
+  success: '#4CAF50',
+  warning: '#FFDF00',
+  lightPink: '#FFE6EB',
+  textDark: '#111827',
+  textMedium: '#6B7280',
+  border: '#D1D5DB',
+};
 
 // Types
 interface Fund {
@@ -90,9 +115,9 @@ const fundService = {
       // Set timeout for API call to prevent hanging
       const userId = await AsyncStorage.getItem('userId') || 'default_user'; // Get userId from storage
       console.log('Fetching funds with userId:', userId);
-      console.log('API URL:', API_BASE_URL);
+      console.log('API URL:', COUPLE_FUND_ENDPOINT);
       
-      const response = await axios.get(API_BASE_URL, {
+      const response = await axios.get(COUPLE_FUND_ENDPOINT, {
         headers: {
           'user-id': userId
         },
@@ -143,7 +168,7 @@ const fundService = {
         }
       };
 
-      const response = await axios.put(API_BASE_URL, requestData, {
+      const response = await axios.put(COUPLE_FUND_ENDPOINT, requestData, {
         headers: {
           'user-id': userId
         }
@@ -189,7 +214,7 @@ const fundService = {
         }
       };
 
-      const response = await axios.put(API_BASE_URL, requestData, {
+      const response = await axios.put(COUPLE_FUND_ENDPOINT, requestData, {
         headers: {
           'user-id': userId
         }
@@ -224,14 +249,16 @@ const fundService = {
       const userId = await AsyncStorage.getItem('userId') || 'default_user';
       const requestData = {
         fundId: id,
-        amount,
+        amount: Math.abs(parseInt(amount.toString())), // Ensure positive integer
         type,
         category: type === 'deposit' ? 'Income' : 'Expense',
         description,
         createdBy: 'User'
       };
 
-      const response = await axios.post(`${API_BASE_URL}/transactions`, requestData, {
+      console.log('Adding transaction:', requestData);
+
+      const response = await axios.post(`${COUPLE_FUND_ENDPOINT}/transactions`, requestData, {
         headers: {
           'user-id': userId
         }
@@ -243,13 +270,10 @@ const fundService = {
           id: data._id,
           title: data.name,
           description: data.description,
-          image: data.image || 'https://storage.googleapis.com/a1aa/image/771bcb81-a9ea-48f4-f960-9d4345331456.jpg',
+          image: data.image || '',
           amount: formatAmount(data.balance.toString()),
           targetAmount: formatAmount(data.goal.amount.toString()),
-          avatars: data.avatarUrls || [
-            'https://storage.googleapis.com/a1aa/image/209b0077-8f69-4baa-1e6e-d52c4c97a589.jpg',
-            'https://storage.googleapis.com/a1aa/image/53530cbf-ea2d-420d-0ab9-2b0982e4d2ac.jpg',
-          ],
+          avatars: data.avatarUrls || [],
           altImage: 'Fund image',
           altAvatar1: 'Avatar of person 1',
           altAvatar2: 'Avatar of person 2',
@@ -270,11 +294,11 @@ const fundService = {
       const userId = await AsyncStorage.getItem('userId') || 'default_user';
       console.log('Using userId for deletion:', userId);
       
-      const response = await axios.delete(`${API_BASE_URL}/${id}`, {
+      const response = await axios.delete(`${COUPLE_FUND_ENDPOINT}/${id}`, {
         headers: {
           'user-id': userId
         },
-        timeout: 8000 // Tăng timeout lên 8 giây
+        timeout: 8000
       });
 
       console.log('Delete response:', response.status, response.data);
@@ -290,7 +314,6 @@ const fundService = {
     } catch (error: any) {
       console.error('Error deleting fund:', error.response?.data || error.message);
       
-      // Kiểm tra lỗi cụ thể và hiển thị thông báo phù hợp
       if (error.response?.data) {
         const errorMessage = error.response.data.message || 'Failed to delete fund';
         Alert.alert('Delete error', errorMessage);
@@ -304,7 +327,45 @@ const fundService = {
       }
       throw error;
     }
-  }
+  },
+
+  async getTransactions(fundId: string): Promise<any[]> {
+    try {
+      const userId = await AsyncStorage.getItem('userId') || 'default_user';
+      const response = await axios.get(`${COUPLE_FUND_ENDPOINT}/transactions/${fundId}`, {
+        headers: {
+          'user-id': userId
+        }
+      });
+      
+      if (response.data.success) {
+        return response.data.data;
+      }
+      throw new Error('Failed to load transactions');
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      throw error;
+    }
+  },
+
+  async getReminders(fundId: string): Promise<any[]> {
+    try {
+      const userId = await AsyncStorage.getItem('userId') || 'default_user';
+      const response = await axios.get(`${COUPLE_FUND_ENDPOINT}/reminders/${fundId}`, {
+        headers: {
+          'user-id': userId
+        }
+      });
+      
+      if (response.data.success) {
+        return response.data.data;
+      }
+      throw new Error('Failed to load reminders');
+    } catch (error) {
+      console.error('Error loading reminders:', error);
+      throw error;
+    }
+  },
 };
 
 // Helper functions
@@ -411,6 +472,141 @@ const FundProgressBar = ({ progress }: { progress: number }) => {
   );
 };
 
+// New PinAuthModal Component
+interface PinAuthModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const PinAuthModal: React.FC<PinAuthModalProps> = ({ visible, onClose, onSuccess }) => {
+  const [pin, setPin] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [useBiometric, setUseBiometric] = useState(false);
+
+  // Check if biometric auth is available
+  useEffect(() => {
+    const checkBiometric = async () => {
+      const settings = await getSecuritySettings();
+      const isBiometricSupported = await checkBiometricSupport();
+      setUseBiometric(settings.useBiometric && isBiometricSupported);
+      
+      if (settings.useBiometric && isBiometricSupported) {
+        handleBiometricAuth();
+      }
+    };
+    
+    if (visible) {
+      checkBiometric();
+      resetPin();
+    }
+  }, [visible]);
+
+  const resetPin = () => {
+    setPin('');
+    setErrorMessage('');
+  };
+
+  const handleBiometricAuth = async () => {
+    try {
+      const result = await authenticateWithBiometrics();
+      if (result) {
+        onSuccess();
+      }
+    } catch (error) {
+      console.error('Biometric auth error:', error);
+    }
+  };
+
+  const handlePinChange = (text: string) => {
+    // Only allow numbers and limit to 6 digits
+    const newPin = text.replace(/[^0-9]/g, '').slice(0, 6);
+    setPin(newPin);
+    setErrorMessage('');
+  };
+
+  const handleVerifyPin = async () => {
+    if (pin.length !== 6) {
+      setErrorMessage('Please enter all 6 digits');
+      return;
+    }
+
+    const isValid = await verifyPin(pin);
+    if (isValid) {
+      setErrorMessage('');
+      onSuccess();
+    } else {
+      setErrorMessage('Incorrect PIN');
+      resetPin();
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.authModalContainer}>
+          <View style={styles.authModalContent}>
+            <Text style={styles.authTitle}>Authenticate</Text>
+            <Text style={styles.authMessage}>Please authenticate to edit the fund</Text>
+            
+            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+            
+            <View style={styles.pinInputContainer}>
+              <TextInput
+                style={[
+                  styles.authPinInput,
+                  { width: '100%', height: 55, letterSpacing: 1 },
+                  errorMessage ? { borderColor: '#DC2626', borderWidth: 2, backgroundColor: '#FEF2F2' } : {}
+                ]}
+                keyboardType="numeric"
+                maxLength={6}
+                value={pin}
+                onChangeText={handlePinChange}
+                secureTextEntry
+                placeholder="Enter 6-digit PIN"
+                placeholderTextColor="#9CA3AF"
+                autoFocus
+              />
+            </View>
+            
+            <TouchableOpacity 
+              style={[
+                styles.authButton,
+                pin.length === 6 ? { opacity: 1 } : { opacity: 0.7 }
+              ]} 
+              onPress={handleVerifyPin}
+              disabled={pin.length !== 6}
+            >
+              <Text style={styles.authButtonText}>Confirm</Text>
+            </TouchableOpacity>
+            
+            {useBiometric && (
+              <TouchableOpacity 
+                style={styles.authButton} 
+                onPress={handleBiometricAuth}
+              >
+                <Text style={styles.authButtonText}>Use Biometric</Text>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.cancelAuthButton} 
+              onPress={onClose}
+            >
+              <Text style={styles.cancelAuthText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+};
+
 const CoupleFundScreen: React.FC = () => {
   // Add font loading state
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -463,6 +659,27 @@ const CoupleFundScreen: React.FC = () => {
 
   // Add refreshing state
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // New states for features
+  const [showTransactionHistory, setShowTransactionHistory] = useState(false);
+  const [showReminderSettings, setShowReminderSettings] = useState(false);
+  const [showSecuritySettings, setShowSecuritySettings] = useState(false);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [securitySettings, setSecuritySettings] = useState({
+    requirePin: false,
+    pin: '',
+    useBiometric: false
+  });
+
+  // New state for authentication modal
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  // Add new state for PIN confirmation
+  const [pinConfirmation, setPinConfirmation] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [isConfirmingPin, setIsConfirmingPin] = useState(false);
 
   // Add onRefresh handler
   const onRefresh = useCallback(async () => {
@@ -643,111 +860,40 @@ const CoupleFundScreen: React.FC = () => {
     }
   };
 
-  const handleImagePick = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant permission to access your photo library');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [16, 9],
-        quality: 0.8,
-        base64: true,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const newImageUri = result.assets[0].uri;
-        
-        // Convert to base64 if not already available
-        const base64Image = result.assets[0].base64 
-          ? `data:image/jpeg;base64,${result.assets[0].base64}`
-          : await convertImageToBase64(newImageUri);
-          
-        console.log('Image selected, size:', base64Image.length);
-        
-        // Cập nhật UI tạm thời chỉ cho fund hiện tại
-        if (selectedFund) {
-          // Tạo một bản sao tạm thời của fund được chọn với ảnh mới
-          const updatedSelectedFund = {
-            ...selectedFund,
-            image: newImageUri // Hiển thị ảnh local trước khi upload
-          };
-          
-          // Cập nhật UI cho fund được chọn
-          setSelectedImage(newImageUri);
-          setSelectedFund(updatedSelectedFund);
-          
-          try {
-            console.log('Updating fund with new image...');
-            
-            // Update fund with base64 image (will be stored on server)
-            const updatedFund = await fundService.updateFund(selectedFund.id, { 
-              image: base64Image,
-              // Make sure to pass existing values to avoid resetting them
-              title: selectedFund.title,
-              description: selectedFund.description,
-              amount: selectedFund.amount,
-              targetAmount: selectedFund.targetAmount
-            });
-            
-            console.log('Fund updated with new image:', updatedFund.image);
-            
-            // Cập nhật state với fund đã cập nhật từ server
-            setSelectedFund(updatedFund);
-            
-            // Cập nhật mảng funds nhưng chỉ thay đổi fund hiện tại
-            const updatedFunds = funds.map(fund => 
-              fund.id === selectedFund.id ? updatedFund : fund
-            );
-            
-            setFunds(updatedFunds);
-            await saveFundsData(updatedFunds);
-            
-            // Xóa ảnh tạm sau khi đã cập nhật thành công
-            setSelectedImage(null);
-            
-            // Alert user of success
-            Alert.alert('Success', 'Image updated successfully');
-          } catch (error) {
-            console.error('Error updating fund image:', error);
-            Alert.alert('Error', 'Failed to update fund image. Please try again.');
-            
-            // Khôi phục lại ảnh gốc nếu gặp lỗi
-            setSelectedImage(null);
-            setSelectedFund({
-              ...selectedFund,
-              image: selectedFund.image
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+  // Add a general authentication wrapper function
+  const authenticateAction = async (action: () => void | Promise<void>) => {
+    // Get the latest security settings
+    const settings = await getSecuritySettings();
+    
+    // If no authentication methods are enabled, perform the action directly
+    if (!settings.requirePin && !settings.useBiometric) {
+      action();
+      return;
     }
-  };
-
-  // Helper to convert an image URI to base64
-  const convertImageToBase64 = async (uri: string): Promise<string> => {
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result);
-        };
-        reader.onerror = (error) => reject(error);
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error('Error converting image to base64:', error);
-      return '';
+    
+    // Try biometric authentication first if enabled
+    if (settings.useBiometric) {
+      try {
+        const result = await authenticateWithBiometrics();
+        if (result) {
+          // Authentication successful, perform the action
+          action();
+          return;
+        }
+        // Biometric failed, fall back to PIN if available
+      } catch (error) {
+        console.error('Biometric auth error:', error);
+        // Fall back to PIN if available
+      }
+    }
+    
+    // If PIN is required or biometric failed, show PIN modal
+    if (settings.requirePin) {
+      setPendingAction(() => action);
+      setShowAuthModal(true);
+    } else {
+      // No authentication methods available or successful
+      Alert.alert('Authentication Failed', 'Please enable a security method in settings.');
     }
   };
 
@@ -842,6 +988,169 @@ const CoupleFundScreen: React.FC = () => {
     }
   };
 
+  const performEdit = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Format the amounts for display
+      const formattedCurrentAmount = editingFund.currentAmount ? formatAmount(editingFund.currentAmount) : "0đ";
+      const formattedTargetAmount = formatAmount(editingFund.targetAmount);
+      
+      // Clean and parse amounts
+      const currentAmountClean = formattedCurrentAmount.replace(/[^\d]/g, '');
+      const prevAmountClean = selectedFund!.amount.replace(/[^\d]/g, '');
+      const currentAmountValue = Number(currentAmountClean);
+      const prevAmountValue = Number(prevAmountClean);
+      
+      // Check if amounts are valid numbers
+      if (isNaN(currentAmountValue) || isNaN(prevAmountValue)) {
+        Alert.alert('Error', 'Invalid amount format. Please enter valid numbers.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Prepare complete fund data for update
+      const fundData = {
+        title: editingFund.title,
+        description: editingFund.description || selectedFund!.description,
+        amount: formattedCurrentAmount,
+        targetAmount: formattedTargetAmount,
+        image: selectedImage || selectedFund!.image,
+      };
+      
+      console.log('Attempting to update fund with data:', fundData);
+      
+      // Create a transaction record if amount has changed
+      // But do it separately from the fund update
+      let transactionResult = null;
+      if (currentAmountValue !== prevAmountValue) {
+        const difference = currentAmountValue - prevAmountValue;
+        const transactionType = difference > 0 ? 'deposit' : 'withdraw';
+        const transactionAmount = Math.abs(difference);
+        
+        console.log(`Amount change detected: ${prevAmountValue} -> ${currentAmountValue}, diff: ${difference}`);
+        
+        try {
+          // Try to add a transaction record
+          transactionResult = await fundService.addTransaction(
+            selectedFund!.id,
+            transactionAmount,
+            transactionType,
+            `Manual ${transactionType} adjustment`
+          );
+          console.log('Transaction added successfully');
+        } catch (transactionError) {
+          console.error('Failed to add transaction, but will continue with fund update:', transactionError);
+          // We continue with the fund update even if transaction creation fails
+        }
+      }
+      
+      // Perform the actual fund update with simplified approach
+      try {
+        // Try a direct update first - update all fields at once
+        const updatedFund = await fundService.updateFund(selectedFund!.id, fundData);
+        
+        // Update local state with the updated fund
+        const updatedFunds = funds.map(fund => 
+          fund.id === selectedFund!.id ? updatedFund : fund
+        );
+        
+        setFunds(updatedFunds);
+        await saveFundsData(updatedFunds);
+        setSelectedFund(updatedFund);
+        
+        // Refresh transactions if we added a new one or if requested
+        if (transactionResult || currentAmountValue !== prevAmountValue) {
+          try {
+            const updatedTransactions = await fundService.getTransactions(selectedFund!.id);
+            setTransactions(updatedTransactions);
+          } catch (error) {
+            console.error('Error fetching updated transactions:', error);
+            // Non-critical error, continue
+          }
+        }
+        
+        // Check if fund was just completed for notification
+        const progress = calculateProgress(formattedCurrentAmount, formattedTargetAmount);
+        if (progress >= 100 && notificationsPermission && !notifiedFunds.includes(updatedFund.id)) {
+          try {
+            await sendFundCompletionNotification(updatedFund.title);
+            const newNotifiedFunds = [...notifiedFunds, updatedFund.id];
+            setNotifiedFunds(newNotifiedFunds);
+            await AsyncStorage.setItem('notified_funds', JSON.stringify(newNotifiedFunds));
+          } catch (notificationError) {
+            console.error('Error sending notification:', notificationError);
+            // Non-critical error, continue
+          }
+        }
+        
+        Alert.alert('Success', 'Fund updated successfully');
+      } catch (updateError) {
+        console.error('Initial update failed, trying fallback method:', updateError);
+        
+        // Fallback: Try updating fields one by one
+        try {
+          // Start with non-amount fields
+          await fundService.updateFund(selectedFund!.id, {
+            title: editingFund.title,
+            description: editingFund.description || selectedFund!.description,
+            image: selectedImage || selectedFund!.image,
+          });
+          
+          // Update target amount separately
+          await fundService.updateFund(selectedFund!.id, {
+            targetAmount: formattedTargetAmount
+          });
+          
+          // Update current amount last (most likely to cause issues)
+          await fundService.updateFund(selectedFund!.id, {
+            amount: formattedCurrentAmount
+          });
+          
+          // If we got here, updates succeeded - fetch the updated fund
+          const updatedFund = await fundService.getAllFunds().then(
+            funds => funds.find(f => f.id === selectedFund!.id)
+          );
+          
+          if (updatedFund) {
+            // Update local state
+            const updatedFunds = funds.map(fund => 
+              fund.id === selectedFund!.id ? updatedFund : fund
+            );
+            
+            setFunds(updatedFunds);
+            await saveFundsData(updatedFunds);
+            setSelectedFund(updatedFund);
+            
+            // Refresh transactions
+            try {
+              const updatedTransactions = await fundService.getTransactions(selectedFund!.id);
+              setTransactions(updatedTransactions);
+            } catch (error) {
+              console.error('Error fetching updated transactions in fallback:', error);
+            }
+            
+            Alert.alert('Success', 'Fund updated successfully');
+          } else {
+            throw new Error('Failed to get updated fund data');
+          }
+        } catch (fallbackError) {
+          console.error('Fallback update failed:', fallbackError);
+          Alert.alert('Update Error', 'Could not update the fund. Please try again later or with different values.');
+        }
+      }
+      
+      // Exit edit mode regardless of success/failure
+      setIsEditMode(false);
+    } catch (error) {
+      console.error('Unexpected error in performEdit:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update handleEditFund to skip auth check since we already authenticated to enter edit mode
   const handleEditFund = async () => {
     if (!selectedFund || !editingFund.title || !editingFund.targetAmount) {
       Alert.alert('Missing information', 'Please fill in all required fields');
@@ -849,55 +1158,34 @@ const CoupleFundScreen: React.FC = () => {
     }
 
     try {
-      setIsLoading(true);
-      
-      const formattedCurrentAmount = editingFund.currentAmount ? formatAmount(editingFund.currentAmount) : "0đ";
-      const formattedTargetAmount = formatAmount(editingFund.targetAmount);
-      
-      const currentAmountValue = parseInt(formattedCurrentAmount.replace(/[^\d]/g, ''), 10);
-      const prevAmountValue = parseInt(selectedFund.amount.replace(/[^\d]/g, ''), 10);
-      
-      // Logging for debugging
-      console.log('Editing fund - current amount value:', currentAmountValue);
-      console.log('Editing fund - prev amount value:', prevAmountValue);
-      
-      const fundData = {
-        title: editingFund.title,
-        description: editingFund.description || selectedFund.description,
-        amount: formattedCurrentAmount,
-        targetAmount: formattedTargetAmount,
-        image: selectedImage || selectedFund.image,
-      };
-      
-      // Update fund via API
-      const updatedFund = await fundService.updateFund(selectedFund.id, fundData);
-      
-      // Update local state
-      const updatedFunds = funds.map(fund => 
-        fund.id === selectedFund.id ? updatedFund : fund
-      );
-
-      setFunds(updatedFunds);
-      await saveFundsData(updatedFunds);
-      setSelectedFund(updatedFund);
-      setIsEditMode(false);
-      
-      // Check if fund was just completed
-      const progress = calculateProgress(formattedCurrentAmount, formattedTargetAmount);
-      if (progress >= 100 && notificationsPermission && !notifiedFunds.includes(updatedFund.id)) {
-        await sendFundCompletionNotification(updatedFund.title);
-        const newNotifiedFunds = [...notifiedFunds, updatedFund.id];
-        setNotifiedFunds(newNotifiedFunds);
-        await AsyncStorage.setItem('notified_funds', JSON.stringify(newNotifiedFunds));
-      }
+      // Proceed directly as authentication was already performed to enter edit mode
+      await performEdit();
     } catch (error) {
-      console.error('Error updating fund:', error);
+      console.error('Error in handleEditFund:', error);
       Alert.alert('Error', 'Failed to update fund. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
+  // Update handleEditButtonPress to use the wrapper
+  const handleEditButtonPress = () => {
+    if (!isEditMode) {
+      // Switching to edit mode requires authentication
+      authenticateAction(() => {
+        setEditingFund({
+          title: selectedFund?.title || '',
+          description: selectedFund?.description || '',
+          currentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '',
+          targetAmount: selectedFund?.targetAmount.replace(/[^0-9.]/g, '') || '',
+        });
+        setIsEditMode(true);
+      });
+    } else {
+      // Already in edit mode, just save without re-authenticating
+      handleEditFund();
+    }
+  };
+
+  // Update handleDeleteFund to use the wrapper
   const handleDeleteFund = async () => {
     if (!selectedFund) return;
 
@@ -909,53 +1197,619 @@ const CoupleFundScreen: React.FC = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            setIsLoading(true);
-            
-            try {
-              // Đảm bảo userId được lưu trong AsyncStorage trước
-              const userId = await AsyncStorage.getItem('userId');
-              if (!userId) {
-                // Nếu chưa có userId, lưu một cái mới
-                const newUserId = `user_${Date.now()}`;
-                await AsyncStorage.setItem('userId', newUserId);
-                console.log('Created and saved new userId:', newUserId);
-              } else {
-                console.log('Using existing userId:', userId);
-              }
+          onPress: () => {
+            authenticateAction(async () => {
+              setIsLoading(true);
               
-              // Delete fund via API
-              const success = await fundService.deleteFund(selectedFund.id);
-              
-              if (success) {
-                console.log('Successfully deleted fund from API');
-                // Update local state
-                const updatedFunds = funds.filter(fund => fund.id !== selectedFund.id);
-                setFunds(updatedFunds);
-                await saveFundsData(updatedFunds);
-                setSelectedFund(null);
-                // Hiển thị thông báo thành công
-                Alert.alert('Success', 'Fund deleted successfully');
-              } else {
-                console.log('API returned false for deletion');
+              try {
+                // Ensure userId is saved in AsyncStorage
+                const userId = await AsyncStorage.getItem('userId');
+                if (!userId) {
+                  // If there's no userId, save a new one
+                  const newUserId = `user_${Date.now()}`;
+                  await AsyncStorage.setItem('userId', newUserId);
+                  console.log('Created and saved new userId:', newUserId);
+                } else {
+                  console.log('Using existing userId:', userId);
+                }
+                
+                // Delete fund via API
+                const success = await fundService.deleteFund(selectedFund.id);
+                
+                if (success) {
+                  console.log('Successfully deleted fund from API');
+                  // Update local state
+                  const updatedFunds = funds.filter(fund => fund.id !== selectedFund.id);
+                  setFunds(updatedFunds);
+                  await saveFundsData(updatedFunds);
+                  setSelectedFund(null);
+                  // Show success message
+                  Alert.alert('Success', 'Fund deleted successfully');
+                } else {
+                  console.log('API returned false for deletion');
+                }
+              } catch (error) {
+                console.error('Error in handleDeleteFund:', error);
+                // Error handling in fundService.deleteFund
+              } finally {
+                setIsLoading(false);
               }
-            } catch (error) {
-              console.error('Error in handleDeleteFund:', error);
-              // Thông báo lỗi được xử lý trong fundService.deleteFund
-            } finally {
-              setIsLoading(false);
-            }
-          },
+            });
+          }
         },
       ],
       { cancelable: true }
     );
   };
 
+  // Update image picking to NOT require authentication
+  const handleImagePick = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant permission to access your photo library');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const newImageUri = result.assets[0].uri;
+        
+        // Convert to base64 if not already available
+        const base64Image = result.assets[0].base64 
+          ? `data:image/jpeg;base64,${result.assets[0].base64}`
+          : await convertImageToBase64(newImageUri);
+          
+        console.log('Image selected, size:', base64Image.length);
+        
+        // Update UI temporarily for current fund only
+        if (selectedFund) {
+          // Create a temporary copy of selected fund with new image
+          const updatedSelectedFund = {
+            ...selectedFund,
+            image: newImageUri // Display local image before upload
+          };
+          
+          // Update UI for selected fund
+          setSelectedImage(newImageUri);
+          setSelectedFund(updatedSelectedFund);
+          
+          try {
+            console.log('Updating fund with new image...');
+            
+            // Update fund with base64 image (will be stored on server)
+            const updatedFund = await fundService.updateFund(selectedFund.id, { 
+              image: base64Image,
+              // Make sure to pass existing values to avoid resetting them
+              title: selectedFund.title,
+              description: selectedFund.description,
+              amount: selectedFund.amount,
+              targetAmount: selectedFund.targetAmount
+            });
+            
+            console.log('Fund updated with new image:', updatedFund.image);
+            
+            // Update state with fund updated from server
+            setSelectedFund(updatedFund);
+            
+            // Update funds array but only change current fund
+            const updatedFunds = funds.map(fund => 
+              fund.id === selectedFund.id ? updatedFund : fund
+            );
+            
+            setFunds(updatedFunds);
+            await saveFundsData(updatedFunds);
+            
+            // Clear temp image after successful update
+            setSelectedImage(null);
+            
+            // Alert user of success
+            Alert.alert('Success', 'Image updated successfully');
+          } catch (error) {
+            console.error('Error updating fund image:', error);
+            Alert.alert('Error', 'Failed to update fund image. Please try again.');
+            
+            // Restore original image if error occurs
+            setSelectedImage(null);
+            setSelectedFund({
+              ...selectedFund,
+              image: selectedFund.image
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  // Helper to convert an image URI to base64
+  const convertImageToBase64 = async (uri: string): Promise<string> => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result);
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error converting image to base64:', error);
+      return '';
+    }
+  };
+
+  // Update transaction history button to require authentication
+  const handleTransactionHistoryPress = () => {
+    if (!selectedFund) return;
+    
+    authenticateAction(() => {
+      // Load transactions for the selected fund
+      fundService.getTransactions(selectedFund.id)
+        .then(data => {
+          setTransactions(data);
+          setShowTransactionHistory(true);
+        })
+        .catch(error => {
+          console.error('Error loading transactions:', error);
+          Alert.alert('Error', 'Failed to load transaction history');
+        });
+    });
+  };
+
+  // Update reminder settings button to require authentication
+  const handleReminderSettingsPress = () => {
+    if (!selectedFund) return;
+    
+    authenticateAction(() => {
+      // Load reminders for the selected fund
+      fundService.getReminders(selectedFund.id)
+        .then(data => {
+          setReminders(data);
+          setShowReminderSettings(true);
+        })
+        .catch(error => {
+          console.error('Error loading reminders:', error);
+          Alert.alert('Error', 'Failed to load reminders');
+        });
+    });
+  };
+
+  // Update security settings button to require authentication
+  const handleSecuritySettingsPress = () => {
+    authenticateAction(() => {
+      // Load security settings
+      AsyncStorage.getItem('security_settings')
+        .then(settings => {
+          if (settings) {
+            setSecuritySettings(JSON.parse(settings));
+          }
+          setShowSecuritySettings(true);
+        })
+        .catch(error => {
+          console.error('Error loading security settings:', error);
+          setShowSecuritySettings(true);
+        });
+    });
+  };
+
+  // Handle successful authentication
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  };
+
   // Function to explode confetti manually for completed funds
   const triggerCelebration = () => {
     confettiRef.current?.start();
   };
+
+  // Transaction History Modal
+  const renderTransactionHistoryModal = () => {
+    // Helper function to group transactions by date
+    const groupTransactionsByDate = (transactions: any[]) => {
+      if (!transactions || transactions.length === 0) {
+        return {};
+      }
+      const grouped: { [key: string]: any[] } = {};
+      transactions.forEach(transaction => {
+        const date = new Date(transaction.date);
+        let dateKey = date.toLocaleDateString('en-GB', { 
+          day: '2-digit', 
+          month: 'short', 
+          year: 'numeric' 
+        });
+
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+
+        if (date.toDateString() === today.toDateString()) {
+          dateKey = 'Today';
+        } else if (date.toDateString() === yesterday.toDateString()) {
+          dateKey = 'Yesterday';
+        }
+
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+        grouped[dateKey].push(transaction);
+      });
+      return grouped;
+    };
+
+    const groupedTransactions = groupTransactionsByDate(transactions);
+    const sortedDateKeys = Object.keys(groupedTransactions).sort((a, b) => {
+      if (a === 'Today') return -1;
+      if (b === 'Today') return 1;
+      if (a === 'Yesterday') return -1;
+      if (b === 'Yesterday') return 1;
+      return new Date(b).getTime() - new Date(a).getTime();
+    });
+
+    return (
+      <Modal
+        visible={showTransactionHistory}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowTransactionHistory(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { height: '100%', borderTopLeftRadius: 24, borderTopRightRadius: 24 }]}>  
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Transaction History</Text>
+              <TouchableOpacity 
+                onPress={() => setShowTransactionHistory(false)}
+                style={styles.closeButton}
+              >
+                <FontAwesome name="times" size={24} color="#666666" />
+              </TouchableOpacity>
+            </View>
+            {/* Summary Section */}
+            <View style={styles.transactionSummary}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Deposits</Text>
+                <Text style={styles.summaryValue}>
+                  {formatAmount(transactions
+                    .filter(t => t.type === 'deposit')
+                    .reduce((sum, t) => sum + t.amount, 0).toString())}
+                </Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Withdrawals</Text>
+                <Text style={styles.summaryValue}>
+                  {formatAmount(transactions
+                    .filter(t => t.type === 'withdraw')
+                    .reduce((sum, t) => sum + t.amount, 0).toString())}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.transactionListHeader}>
+              <Text style={styles.transactionListTitle}>Recent Transactions</Text>
+            </View>
+            <ScrollView style={styles.transactionList} showsVerticalScrollIndicator={false}>
+              {transactions.length === 0 ? (
+                <View style={styles.emptyTransactions}>
+                  <FontAwesome5 name="file-invoice-dollar" size={48} color="#CBD5E0" />
+                  <Text style={styles.emptyTransactionsText}>No transactions yet</Text>
+                  <Text style={styles.emptyTransactionsSubText}>
+                    Transactions will appear here when you add or withdraw funds.
+                  </Text>
+                </View>
+              ) : (
+                sortedDateKeys.map(dateKey => (
+                  <View key={dateKey}>
+                    <Text style={styles.transactionDateHeader}>{dateKey}</Text>
+                    {groupedTransactions[dateKey].map((transaction, index) => (
+                      <TouchableOpacity
+                        key={transaction.id || index}
+                        activeOpacity={0.85}
+                        style={[
+                          styles.transactionCard,
+                          index === groupedTransactions[dateKey].length - 1 && { marginBottom: 16 }
+                        ]}
+                      >
+                        <View style={styles.transactionCardRow}>
+                          <View style={styles.transactionIconContainer}>
+                            <View style={[
+                              styles.transactionIcon, 
+                              { backgroundColor: transaction.type === 'deposit' ? '#E9F7EF' : '#FDEDEC' }
+                            ]}>
+                              <FontAwesome5 
+                                name={transaction.type === 'deposit' ? 'arrow-down' : 'arrow-up'} 
+                                size={18} 
+                                color={transaction.type === 'deposit' ? '#4CAF50' : '#DC2626'} 
+                              />
+                            </View>
+                          </View>
+                          <View style={styles.transactionCardInfo}>
+                            <Text style={styles.transactionCardType}>
+                              {transaction.type === 'deposit' ? 'Deposit' : 'Withdrawal'}
+                            </Text>
+                            <Text style={styles.transactionCardDesc} numberOfLines={1} ellipsizeMode="tail">
+                              {transaction.description || `Manual ${transaction.type}`}
+                            </Text>
+                          </View>
+                          <View style={styles.transactionCardAmountBox}>
+                            <Text style={[
+                              styles.transactionCardAmount,
+                              transaction.type === 'deposit' ? styles.depositAmount : styles.withdrawAmount
+                            ]}>
+                              {transaction.type === 'deposit' ? '+' : '-'}{formatAmount(transaction.amount.toString())}
+                            </Text>
+                            <Text style={styles.transactionCardTime}>
+                              {new Date(transaction.date).toLocaleTimeString('en-GB', {
+                                hour: '2-digit', 
+                                minute: '2-digit'
+                              })}
+                            </Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // Smart Reminders Modal
+  const renderReminderSettingsModal = () => (
+    <Modal
+      visible={showReminderSettings}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowReminderSettings(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={[styles.modalContent, { height: '80%' }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Smart Reminders</Text>
+            <TouchableOpacity onPress={() => setShowReminderSettings(false)}>
+              <FontAwesome name="times" size={24} color="#666666" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.reminderList}>
+            {reminders.map((reminder, index) => (
+              <View key={index} style={styles.reminderItem}>
+                <View style={styles.reminderItemHeader}>
+                  <Text style={styles.reminderName}>{reminder.title}</Text>
+                  <Text style={styles.reminderTime}>{reminder.frequency}</Text>
+                </View>
+                <Text style={styles.reminderDescription}>{reminder.description}</Text>
+                <View style={styles.reminderActions}>
+                  <TouchableOpacity 
+                    style={styles.reminderActionButton}
+                    onPress={() => {/* Edit reminder */}}
+                  >
+                    <Text style={styles.reminderActionText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.reminderActionButton, { backgroundColor: '#DC2626' }]}
+                    onPress={() => {/* Delete reminder */}}
+                  >
+                    <Text style={styles.reminderActionText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity 
+            style={styles.actionButtonLarge}
+            onPress={() => {/* Add new reminder */}}
+          >
+            <Text style={styles.actionButtonLargeText}>Add New Reminder</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Security Settings Modal
+  const renderSecuritySettingsModal = () => (
+    <Modal
+      visible={showSecuritySettings}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowSecuritySettings(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={[styles.modalContent, { height: '80%' }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Security Settings</Text>
+            <TouchableOpacity onPress={() => {
+              setShowSecuritySettings(false);
+              setPinConfirmation('');
+              setIsConfirmingPin(false);
+              setPinError('');
+            }}>
+              <FontAwesome name="times" size={24} color="#666666" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ padding: 16 }}>
+            <View style={styles.settingItem}>
+              <Text style={styles.settingLabel}>Require PIN for Access</Text>
+              <Switch
+                value={securitySettings.requirePin}
+                onValueChange={async (value) => {
+                  if (value) {
+                    // When enabling PIN, show PIN input
+                    setSecuritySettings(prev => ({
+                      ...prev,
+                      requirePin: value
+                    }));
+                  } else {
+                    // When disabling PIN, only verify if PIN was previously set
+                    if (securitySettings.pin && securitySettings.pin.length > 0) {
+                      try {
+                        const isValid = await verifyPin(securitySettings.pin);
+                        if (isValid) {
+                          setSecuritySettings(prev => ({
+                            ...prev,
+                            requirePin: false,
+                            pin: ''
+                          }));
+                        } else {
+                          Alert.alert('Error', 'Please verify your current PIN first');
+                        }
+                      } catch (error) {
+                        console.error('PIN verification error:', error);
+                        Alert.alert('Error', 'Failed to verify PIN. Please try again.');
+                      }
+                    } else {
+                      // No PIN was set, so just disable it without verification
+                      setSecuritySettings(prev => ({
+                        ...prev,
+                        requirePin: false,
+                        pin: ''
+                      }));
+                    }
+                  }
+                }}
+              />
+            </View>
+
+            {securitySettings.requirePin && !isConfirmingPin && (
+              <View style={styles.pinInputContainer}>
+                <Text style={styles.pinInputLabel}>Enter 6-digit PIN</Text>
+                <TextInput
+                  style={[styles.authPinInput, { width: '100%', height: 55, letterSpacing: 1 }]}
+                  placeholder="Enter 6-digit PIN"
+                  keyboardType="numeric"
+                  secureTextEntry
+                  maxLength={6}
+                  value={securitySettings.pin}
+                  onChangeText={(pin) => {
+                    setPinError('');
+                    setSecuritySettings(prev => ({
+                      ...prev,
+                      pin
+                    }));
+                  }}
+                />
+                {securitySettings.pin.length === 6 && (
+                  <TouchableOpacity 
+                    style={[styles.actionButtonLarge, { marginTop: 16 }]}
+                    onPress={() => {
+                      if (securitySettings.pin.length === 6) {
+                        setIsConfirmingPin(true);
+                      } else {
+                        setPinError('PIN must be 6 digits');
+                      }
+                    }}
+                  >
+                    <Text style={styles.actionButtonLargeText}>Confirm PIN</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {securitySettings.requirePin && isConfirmingPin && (
+              <View style={styles.pinInputContainer}>
+                <Text style={styles.pinInputLabel}>Confirm 6-digit PIN</Text>
+                <TextInput
+                  style={[styles.authPinInput, { width: '100%', height: 55, letterSpacing: 1 }]}
+                  placeholder="Confirm 6-digit PIN"
+                  keyboardType="numeric"
+                  secureTextEntry
+                  maxLength={6}
+                  value={pinConfirmation}
+                  onChangeText={(pin) => {
+                    setPinError('');
+                    setPinConfirmation(pin);
+                  }}
+                />
+                {pinError ? <Text style={styles.errorText}>{pinError}</Text> : null}
+              </View>
+            )}
+
+            <View style={[styles.settingItem, { marginTop: 16 }]}>
+              <Text style={styles.settingLabel}>Use Biometric Authentication</Text>
+              <Switch
+                value={securitySettings.useBiometric}
+                onValueChange={async (value) => {
+                  // Require biometric authentication to change this setting
+                  try {
+                    const authResult = await authenticateWithBiometrics();
+                    if (authResult) {
+                      setSecuritySettings(prev => ({
+                        ...prev,
+                        useBiometric: value
+                      }));
+                    }
+                  } catch (error) {
+                    console.error('Biometric auth error:', error);
+                    Alert.alert('Error', 'Biometric authentication failed');
+                  }
+                }}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity 
+            style={[styles.actionButtonLarge, { marginTop: 'auto', marginBottom: 16 }]}
+            onPress={async () => {
+              try {
+                if (securitySettings.requirePin) {
+                  if (isConfirmingPin) {
+                    if (pinConfirmation !== securitySettings.pin) {
+                      setPinError('PINs do not match');
+                      return;
+                    }
+                    if (pinConfirmation.length !== 6) {
+                      setPinError('PIN must be 6 digits');
+                      return;
+                    }
+                  } else {
+                    if (securitySettings.pin.length !== 6) {
+                      setPinError('PIN must be 6 digits');
+                      return;
+                    }
+                  }
+                }
+
+                const { saveSecuritySettings } = await import('../../utils/authentication');
+                await saveSecuritySettings(securitySettings);
+                Alert.alert('Success', 'Security settings saved successfully');
+                setShowSecuritySettings(false);
+                setPinConfirmation('');
+                setIsConfirmingPin(false);
+                setPinError('');
+              } catch (error) {
+                console.error('Error saving security settings:', error);
+                Alert.alert('Error', 'Failed to save security settings');
+              }
+            }}
+          >
+            <Text style={styles.actionButtonLargeText}>Save Settings</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   // Render functions
   const renderFundItem = ({ item }: { item: Fund }) => {
@@ -1137,17 +1991,7 @@ const CoupleFundScreen: React.FC = () => {
             </Text>
             <TouchableOpacity 
               accessibilityLabel="Edit"
-              onPress={() => {
-                if (!isEditMode) {
-                  setEditingFund({
-                    title: selectedFund?.title || '',
-                    description: selectedFund?.description || '',
-                    currentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '',
-                    targetAmount: selectedFund?.targetAmount.replace(/[^0-9.]/g, '') || '',
-                  });
-                }
-                setIsEditMode(!isEditMode);
-              }}
+              onPress={handleEditButtonPress}
             >
               <FontAwesome5 name={isEditMode ? "check" : "edit"} size={24} color="#FFFFFF" />
             </TouchableOpacity>
@@ -1264,7 +2108,14 @@ const CoupleFundScreen: React.FC = () => {
                         />
                         {showCelebration && (
                           <View style={styles.celebrationContainer}>
-                            <Text style={styles.celebrationText}>🎉 Congratulations! Fund completed! 🎉</Text>
+                            <Text style={styles.celebrationText}>
+                              🎉 Congratulations! Fund completed! 🎉
+                              {isCompleted && (
+                                <Text style={{ fontSize: 12, color: '#666', fontWeight: 'normal' }}>
+                                  {"\n"}You can still edit this fund if needed
+                                </Text>
+                              )}
+                            </Text>
                             <TouchableOpacity 
                               style={styles.celebrateAgainButton} 
                               onPress={triggerCelebration}
@@ -1287,18 +2138,20 @@ const CoupleFundScreen: React.FC = () => {
                       </View>
 
                       <View style={styles.optionsSection}>
-                        <View style={styles.optionItem}>
-                          <FontAwesome5 name="hand-peace" size={18} color="#EE1D52" />
-                          <Text style={styles.optionText}>Reminder to{'\n'}contribute</Text>
-                        </View>
-                        <View style={styles.optionItem}>
-                          <FontAwesome5 name="qrcode" size={18} color="#EE1D52" />
-                          <Text style={styles.optionText}>QR fundraiser</Text>
-                        </View>
-                        <View style={styles.optionItem}>
-                          <FontAwesome5 name="money-bill-wave" size={18} color="#EE1D52" />
-                          <Text style={styles.optionText}>Payment,{'\n'}money transfer</Text>
-                        </View>
+                        <TouchableOpacity style={styles.optionItem} onPress={handleTransactionHistoryPress}>
+                          <FontAwesome5 name="history" size={20} color="#EE1D52" />
+                          <Text style={styles.optionText}>Transaction{'\n'}History</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.optionItem} onPress={handleReminderSettingsPress}>
+                          <FontAwesome5 name="bell" size={20} color="#EE1D52" />
+                          <Text style={styles.optionText}>Smart{'\n'}Reminders</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.optionItem} onPress={handleSecuritySettingsPress}>
+                          <FontAwesome5 name="shield-alt" size={20} color="#EE1D52" />
+                          <Text style={styles.optionText}>Security{'\n'}Settings</Text>
+                        </TouchableOpacity>
                       </View>
 
                       <TouchableOpacity
@@ -1315,6 +2168,16 @@ const CoupleFundScreen: React.FC = () => {
             </TouchableWithoutFeedback>
           </ScrollView>
         </SafeAreaView>
+
+        {/* Add the PinAuthModal */}
+        <PinAuthModal 
+          visible={showAuthModal}
+          onClose={() => {
+            setShowAuthModal(false);
+            setPendingAction(null);
+          }}
+          onSuccess={handleAuthSuccess}
+        />
 
         {/* Confetti overlay */}
         {showCelebration && (
@@ -1487,6 +2350,9 @@ const CoupleFundScreen: React.FC = () => {
     <>
       {selectedFund ? renderFundDetail() : renderFundList()}
       {renderCreateFundModal()}
+      {renderTransactionHistoryModal()}
+      {renderReminderSettingsModal()}
+      {renderSecuritySettingsModal()}
     </>
   );
 };
