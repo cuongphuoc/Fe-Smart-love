@@ -3,7 +3,15 @@ const Task = require('../models/Task');
 // Get all tasks
 exports.getAllTasks = async (req, res) => {
   try {
-    const tasks = await Task.find({}).sort({ dueDate: 1 });
+    const { deviceId } = req.query;
+    let filter = {};
+    
+    // If deviceId is provided, filter tasks by deviceId
+    if (deviceId) {
+      filter = { deviceId };
+    }
+    
+    const tasks = await Task.find(filter).sort({ dueDate: 1 });
     
     res.status(200).json({
       success: true,

@@ -4,14 +4,61 @@ const { width } = Dimensions.get('window');
 const SCREEN_PADDING = 16;
 const CARD_WIDTH = width - (SCREEN_PADDING * 2);
 
-// Thêm constants cho màu sắc
+// Color constants for better organization and reuse
 const COLORS = {
-  primary: '#f03a6c',
+  primary: '#EE1D52',
   secondary: '#666666',
   white: '#FFFFFF',
   lightGray: '#F3F4F6',
-  icon: '#333333',
+  darkGray: '#4B5563',
   background: '#F3F4F6',
+  success: '#4CAF50',
+  warning: '#FFDF00',
+  lightPink: '#FFE6EB',
+  textDark: '#111827',
+  textMedium: '#6B7280',
+  border: '#D1D5DB',
+};
+
+// Common styles that are reused
+const commonStyles = {
+  shadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  flexRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  button: {
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  input: {
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: COLORS.textDark,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
 };
 
 const commonHeaderStyles: ViewStyle = {
@@ -125,34 +172,46 @@ interface Styles {
   confettiOverlay: ViewStyle;
   completedStatus: ViewStyle;
   completedText: TextStyle;
+  editInputsContainer: ViewStyle;
+  amountInputsRow: ViewStyle;
+  amountInputWrapper: ViewStyle;
+  scrollContentContainer: ViewStyle;
 }
 
 export const styles = StyleSheet.create<Styles>({
+  // Base container styles
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6', // bg-gray-100
+    backgroundColor: COLORS.background,
   },
+  
+  // Header styles
   header: commonHeaderStyles,
   headerTitle: {
     fontSize: 18,
     fontWeight: '400',
-    color: '#FFFFFF',
+    color: COLORS.white,
     textAlign: 'center',
     flex: 1,
     fontFamily: 'Roboto',
   },
+  
+  // Placeholder styles
   placeholderImage: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  
+  // Main content styles
   main: {
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
-    // Thay đổi paddingBottom để tránh bị che khuất
     paddingBottom: 16,
   },
+  
+  // Fund creation button styles
   fundCreationButtonContainer: {
     alignItems: 'flex-end',
     marginBottom: 16,
@@ -162,7 +221,7 @@ export const styles = StyleSheet.create<Styles>({
     borderRadius: 30,
     overflow: 'hidden',
     elevation: 4,
-    shadowColor: COLORS.primary, // Thay đổi từ #EC4899
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -176,16 +235,19 @@ export const styles = StyleSheet.create<Styles>({
   },
   fundCreationText: {
     fontSize: 14,
-    color: '#FFFFFF',
+    color: COLORS.white,
     fontWeight: '600',
     letterSpacing: 0.3,
   },
+  
+  // Card list styles
   cardList: {
-    // Thêm paddingBottom cho FlatList
-    paddingBottom: 120, // Tăng padding bottom để tránh bị che khuất bởi bottom tab
+    paddingBottom: 120,
   },
+  
+  // Card styles
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -203,21 +265,21 @@ export const styles = StyleSheet.create<Styles>({
   cardTitleContainer: {
     width: '100%',
     padding: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: COLORS.lightGray,
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textDark,
     textAlign: 'left',
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderBottomLeftRadius: 12,
@@ -236,7 +298,7 @@ export const styles = StyleSheet.create<Styles>({
   },
   cardTargetAmount: {
     fontSize: 12,
-    color: '#6B7280',
+    color: COLORS.textMedium,
     fontWeight: '400',
     marginLeft: 4,
     textAlign: 'center',
@@ -250,22 +312,24 @@ export const styles = StyleSheet.create<Styles>({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
-    marginLeft: -8, // Để các avatar chồng lên nhau
+    borderColor: COLORS.white,
+    marginLeft: -8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   } as ImageStyle,
+  
+  // Detail styles
   detailContainer: {
     flex: 1,
-    backgroundColor: '#F0EFEE', // bg-[#f0efee]
+    backgroundColor: '#F0EFEE',
   },
   detailHeader: commonHeaderStyles,
   detailHeaderTitle: {
     fontSize: 18,
     fontWeight: '400',
-    color: '#FFFFFF',
+    color: COLORS.white,
     textAlign: 'center',
     flex: 1,
     fontFamily: 'Roboto',
@@ -273,11 +337,17 @@ export const styles = StyleSheet.create<Styles>({
   scrollContainer: {
     flex: 1,
   },
+  scrollContentContainer: {
+    flexGrow: 1,
+  },
+  detailContent: {
+    width: '100%',
+  },
   imageContainer: {
     position: 'relative',
-    width: width, // Full width của màn hình
-    height: width * 0.5, // Tỷ lệ 2:1
-    marginBottom: 16, // Thêm khoảng cách giữa ảnh và card
+    width: width,
+    height: width * 0.5,
+    marginBottom: 16,
   },
   backgroundImage: {
     width: '100%',
@@ -318,25 +388,25 @@ export const styles = StyleSheet.create<Styles>({
     letterSpacing: 0.2,
   },
   detailCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderRadius: 16,
-    padding: 16, // Giảm padding từ 20 xuống 16
+    padding: 16,
     marginHorizontal: SCREEN_PADDING,
-    marginBottom: 20, // Thêm margin bottom để tránh che khuất nội dung cuối
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 5,
     alignSelf: 'center',
-    width: CARD_WIDTH, // Đặt chiều rộng dựa trên màn hình
+    width: CARD_WIDTH,
   },
   fundInfo: {
     marginBottom: 20,
   },
   fundBalanceLabel: {
     fontSize: 12,
-    color: '#6B7280', // text-gray-500
+    color: COLORS.textMedium,
     marginBottom: 4,
   },
   fundBalanceAmount: {
@@ -347,8 +417,10 @@ export const styles = StyleSheet.create<Styles>({
   },
   fundDescription: {
     fontSize: 12,
-    color: '#4B5563', // text-gray-600
+    color: COLORS.darkGray,
   },
+  
+  // Action section styles
   actionSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -356,10 +428,10 @@ export const styles = StyleSheet.create<Styles>({
     marginBottom: 20,
   },
   iconCircle: {
-    width: 40, // Giảm kích thước
+    width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFE6EB', // Màu nhạt hơn của primary
+    backgroundColor: COLORS.lightPink,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -367,51 +439,55 @@ export const styles = StyleSheet.create<Styles>({
     flexDirection: 'row',
     flex: 1,
     justifyContent: 'flex-end',
-    gap: 8, // Giảm gap từ 12 xuống 8
+    gap: 8,
   },
   fundButton: {
-    backgroundColor: '#FFE6EB', // Màu nhạt hơn của primary
+    backgroundColor: COLORS.lightPink,
     borderRadius: 8,
     paddingVertical: 8,
-    paddingHorizontal: 16, // Giảm padding ngang
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 80, // Đặt chiều rộng tối thiểu
+    minWidth: 80,
   },
   fundButtonText: {
-    fontSize: 13, // Giảm font size
+    fontSize: 13,
     fontWeight: '600',
-    color: COLORS.primary, // Thay đổi từ #F75A7C
+    color: COLORS.primary,
   },
   buttonIcon: {
     marginRight: 8,
   },
+  
+  // Options section styles
   optionsSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 8, // Thêm padding để các options không sát viền
+    paddingHorizontal: 8,
   },
   optionItem: {
     flex: 1,
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 4, // Thêm padding ngang
+    paddingHorizontal: 4,
   },
   optionText: {
-    fontSize: 11, // Giảm font size
+    fontSize: 11,
     fontWeight: '600',
-    color: '#E6003F', // text-[#e6003f]
+    color: '#E6003F',
     textAlign: 'center',
   },
+  
+  // Bottom nav styles
   detailBottomNav: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB', // border-gray-200
+    borderTopColor: '#E5E7EB',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -424,6 +500,8 @@ export const styles = StyleSheet.create<Styles>({
     maxWidth: 448,
     alignSelf: 'center',
   },
+  
+  // Modal styles
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -432,7 +510,7 @@ export const styles = StyleSheet.create<Styles>({
   },
   popupModalContent: {
     width: '80%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
@@ -441,220 +519,13 @@ export const styles = StyleSheet.create<Styles>({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  input: {
-    width: '100%',
-    height: 40,
-    borderColor: '#D1D5DB',
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    marginBottom: 12,
-  },
-  editButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    gap: 12,
-  },
-  editButton: {
-    flex: 1,
-    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  editButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  progressContainer: {
-    marginTop: 16, // Giảm margin
-    marginBottom: 12,
-  },
-  progressBar: {
-    width: '100%',
-    height: 8,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
-    borderRadius: 4,
-    // Thêm hiệu ứng shadow để trông nổi bật hơn
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  progressText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary, // Thay đổi từ #EC4899
-    textAlign: 'right',
-    marginTop: 8,
-  },
-  amountContainer: {
-    flexDirection: 'row',
-    marginVertical: 16,
-  },
-  amountBox: {
-    flex: 1,
-    padding: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  amountLabel: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  amountInput: {
-    width: '100%',
-    height: 48,
-    borderColor: '#D1D5DB',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    marginBottom: 16,
-    backgroundColor: '#F9FAFB',
-    color: '#111827',
-  },
-  amountInputContainer: {
-    marginBottom: 16,
-  },
-  amountInputLabel: {
-    fontSize: 14,
-    color: '#4B5563',
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-  },
-  deleteButton: {
-    marginTop: 20,
-    backgroundColor: COLORS.primary, // Thay đổi từ #EC4899
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    gap: 8,
-  },
-  deleteButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  listContainer: {
-    flexGrow: 1,
-  },
-  // Thêm styles mới cho responsive
-  detailContent: {
-    width: '100%',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap', // Cho phép wrap khi không đủ space
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  searchContainer: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 40,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#111827',
-  },
-  searchIcon: {
-    width: 16,
-    height: 16,
-  },
-  clearButton: {
-    padding: 4,
-  },
-  cancelButton: {
-    paddingVertical: 8,
-  },
-  cancelButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-  },
-  createdDateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    flexWrap: 'wrap', // Cho phép wrap khi không đủ space
-  },
-  dateItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginRight: 16,
-    marginBottom: 8, // Thêm margin bottom nếu wrap
-  },
-  createdDateText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  cardDate: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end', // Modal sẽ slide up từ dưới
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -672,18 +543,18 @@ export const styles = StyleSheet.create<Styles>({
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textDark,
   },
   modalInput: {
     width: '100%',
     height: 48,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: COLORS.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     marginBottom: 16,
     fontSize: 16,
-    color: '#111827',
+    color: COLORS.textDark,
     backgroundColor: '#F9FAFB',
   },
   modalButtons: {
@@ -695,16 +566,254 @@ export const styles = StyleSheet.create<Styles>({
   modalButton: {
     flex: 1,
     height: 48,
-    backgroundColor: '#EE1D52',
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
   },
+  
+  // Input styles
+  input: {
+    width: '100%',
+    height: 40,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    marginBottom: 12,
+    backgroundColor: COLORS.lightGray,
+  },
+  editInputsContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  amountInputsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  amountInputWrapper: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  amountInput: {
+    width: '100%',
+    height: 48,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    marginBottom: 16,
+    backgroundColor: '#F9FAFB',
+    color: COLORS.textDark,
+  },
+  amountInputContainer: {
+    marginBottom: 16,
+  },
+  amountInputLabel: {
+    fontSize: 14,
+    color: COLORS.darkGray,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  
+  // Button styles
+  editButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    gap: 12,
+  },
+  editButton: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  deleteButton: {
+    marginTop: 20,
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    gap: 8,
+  },
+  deleteButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // Progress bar styles
+  progressContainer: {
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  progressBar: {
+    width: '100%',
+    height: 8,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 4,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+    textAlign: 'right',
+    marginTop: 8,
+  },
+  
+  // Amount display styles
+  amountContainer: {
+    flexDirection: 'row',
+    marginVertical: 16,
+  },
+  amountBox: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  amountLabel: {
+    fontSize: 14,
+    color: COLORS.secondary,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  
+  // Loading styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.lightGray,
+  },
+  
+  // List container styles
+  listContainer: {
+    flexGrow: 1,
+  },
+  
+  // Action buttons styles
+  actionButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  
+  // Search styles
+  searchContainer: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 40,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: COLORS.textDark,
+  },
+  searchIcon: {
+    width: 16,
+    height: 16,
+  },
+  clearButton: {
+    padding: 4,
+  },
+  cancelButton: {
+    paddingVertical: 8,
+  },
+  cancelButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  
+  // Empty state styles
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.secondary,
+    textAlign: 'center',
+  },
+  
+  // Date display styles
+  createdDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    flexWrap: 'wrap',
+  },
+  dateItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 16,
+    marginBottom: 8,
+  },
+  createdDateText: {
+    fontSize: 13,
+    color: COLORS.textMedium,
+    fontWeight: '500',
+  },
+  cardDate: {
+    fontSize: 12,
+    color: COLORS.textMedium,
+    marginTop: 4,
+  },
+  
   // Celebration styles
   celebrationContainer: {
     alignItems: 'center',
@@ -713,12 +822,12 @@ export const styles = StyleSheet.create<Styles>({
     backgroundColor: '#FFF9E6',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FFDF00',
+    borderColor: COLORS.warning,
   },
   celebrationText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textDark,
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -730,7 +839,7 @@ export const styles = StyleSheet.create<Styles>({
     marginTop: 8,
   },
   celebrateAgainText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -743,6 +852,8 @@ export const styles = StyleSheet.create<Styles>({
     pointerEvents: 'none',
     zIndex: 1000,
   },
+  
+  // Status indicators
   completedStatus: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -752,7 +863,7 @@ export const styles = StyleSheet.create<Styles>({
     borderRadius: 12,
   },
   completedText: {
-    color: '#4CAF50',
+    color: COLORS.success,
     fontWeight: 'bold',
     marginLeft: 4,
     fontSize: 12,

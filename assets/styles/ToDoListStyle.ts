@@ -416,6 +416,7 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
     flexWrap: 'wrap',
+    textAlign: 'center',
   },
   taskInput: {
     borderWidth: 1,

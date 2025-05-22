@@ -36,3 +36,20 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# File cấu hình hệ thống
+.DS_Store
+Thumbs.db
+
+# Build output
+dist/
+build/
+
+# File môi trường
+.env
+
+# IDE config
+.vscode/
+.idea/
+*.suo
+*.user

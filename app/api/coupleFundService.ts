@@ -1,148 +1,33 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Custom error class
-class ApiError extends Error {
-  type: string;
-  
-  constructor(message: string, type: string) {
-    super(message);
-    this.type = type;
-    this.name = 'ApiError';
-  }
-}
+// ------ CÁCH CẤU HÌNH ĐƠN GIẢN HƠN ------
 
+// Backend API URL - Thay đổi IP này khi cần thiết
+const BACKEND_IP = '192.168.1.7'; // Đảm bảo IP này trùng với IP của máy bạn
+const API_URL = `http://${BACKEND_IP}:5000/api`;
 
-// Get the API URL from environment variables
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://192.168.1.2:5000';
-
-// Determine if running in development mode
-const isDev = __DEV__;
-
-// Determine the base URL based on the platform
-const getBaseUrl = () => {
-  if (Platform.OS === 'web') {
-    return isDev ? '/api' : '/api';
-  } else if (Platform.OS === 'android') {
-    return isDev ? 'http://192.168.1.2:5000/api' : API_URL + '/api';
-  } else if (Platform.OS === 'ios') {
-    return isDev ? 'http://192.168.1.2:5000/api' : API_URL + '/api';
-  }
-  return API_URL + '/api';
+// Key lưu trữ dữ liệu local
+const LOCAL_STORAGE_KEYS = {
+  FUND_DATA: 'couple_fund_data',
+  LAST_SYNC: 'couple_fund_last_sync',
+  PENDING_CHANGES: 'couple_fund_pending_changes',
+  USER_ID: 'userId'
 };
 
-const API_BASE_URL = getBaseUrl();
-console.log('Using API URL:', API_BASE_URL);
-
-// Create axios instance with timeout and better error handling
+// Tạo axios instance với timeout phù hợp
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 60000, // Increase timeout to 60 seconds
+  baseURL: API_URL,
+  timeout: 10000, // giảm timeout xuống 10 giây để phát hiện lỗi kết nối nhanh hơn
   headers: {
-    'Content-Type': 'application/json',
-    'user-id': 'default_user' // Default user ID
+    'Content-Type': 'application/json'
   }
 });
 
-// Add custom retry configuration
-apiClient.defaults.maxRetries = 3;
-apiClient.defaults.retryDelay = 1000;
+// ------ ĐỊNH NGHĨA INTERFACES ------
 
-// Extend AxiosRequestConfig type
-declare module 'axios' {
-  interface AxiosRequestConfig {
-    maxRetries?: number;
-    retryCount?: number;
-    retryDelay?: number;
-  }
-}
-
-// Custom error types
-export const API_ERROR_TYPES = {
-  NETWORK_ERROR: 'NETWORK_ERROR',
-  TIMEOUT_ERROR: 'TIMEOUT_ERROR',
-  SERVER_ERROR: 'SERVER_ERROR',
-  NOT_FOUND: 'NOT_FOUND',
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-};
-
-// Add request interceptor to include user-id from AsyncStorage
-apiClient.interceptors.request.use(
-  async (config) => {
-    try {
-      const userId = await AsyncStorage.getItem('userId');
-      if (userId) {
-        config.headers['user-id'] = userId;
-      }
-    } catch (error) {
-      console.error('Error getting userId from AsyncStorage:', error);
-    }
-    console.log(`Making ${config.method?.toUpperCase()} request to: ${config.baseURL}${config.url}`);
-    console.log('Request headers:', config.headers);
-    return config;
-  },
-  (error) => {
-    console.error('Request error:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Add response interceptor with improved error handling
-apiClient.interceptors.response.use(
-  (response) => {
-    console.log(`Response from ${response.config.url} status: ${response.status}`);
-    return response;
-  },
-  (error) => {
-    let apiError;
-    
-    if (error.code === 'ECONNABORTED') {
-      console.error('Request timeout! Server might be down or unreachable.');
-      apiError = new ApiError(error.message, API_ERROR_TYPES.TIMEOUT_ERROR);
-    } else if (!error.response) {
-      console.error('Network error! No response received from server.');
-      apiError = new ApiError(error.message, API_ERROR_TYPES.NETWORK_ERROR);
-    } else {
-      let type = API_ERROR_TYPES.SERVER_ERROR;
-      switch (error.response.status) {
-        case 404:
-          type = API_ERROR_TYPES.NOT_FOUND;
-          break;
-        case 422:
-          type = API_ERROR_TYPES.VALIDATION_ERROR;
-          break;
-      }
-      apiError = new ApiError(error.message, type);
-    }
-    
-    return Promise.reject(apiError);
-  }
-);
-
-// Add retry interceptor
-apiClient.interceptors.response.use(undefined, async (err) => {
-  const { config } = err;
-  if (!config || !config.maxRetries) return Promise.reject(err);
-
-  config.retryCount = config.retryCount || 0;
-  
-  if (config.retryCount >= config.maxRetries) {
-    return Promise.reject(err);
-  }
-  
-  config.retryCount += 1;
-  console.log(`Retrying request (${config.retryCount}/${config.maxRetries})...`);
-  
-  // Delay before retrying
-  const delayMs = config.retryDelay || 1000;
-  await new Promise(resolve => setTimeout(resolve, delayMs));
-  
-  return apiClient(config);
-});
-
-// Interface definitions
+// Partner trong quỹ chung
 export interface Partner {
   _id?: string;
   name: string;
@@ -150,6 +35,7 @@ export interface Partner {
   contribution: number;
 }
 
+// Giao dịch
 export interface Transaction {
   _id?: string;
   amount: number;
@@ -160,6 +46,7 @@ export interface Transaction {
   createdBy: string;
 }
 
+// Mục tiêu của quỹ
 export interface Goal {
   name: string;
   amount: number;
@@ -167,6 +54,7 @@ export interface Goal {
   completed: boolean;
 }
 
+// Quỹ chung
 export interface CoupleFund {
   _id?: string;
   name: string;
@@ -178,6 +66,7 @@ export interface CoupleFund {
   updatedAt: string;
 }
 
+// Bộ lọc cho giao dịch
 export interface TransactionFilter {
   type?: 'deposit' | 'withdraw' | 'expense';
   category?: string;
@@ -187,6 +76,7 @@ export interface TransactionFilter {
   limit?: number;
 }
 
+// Format phản hồi từ API
 export interface PaginatedTransactions {
   transactions: Transaction[];
   total: number;
@@ -194,210 +84,591 @@ export interface PaginatedTransactions {
   totalPages: number;
 }
 
-// API response interfaces
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-  timestamp?: string;
+// Trạng thái mạng
+interface NetworkState {
+  isConnected: boolean;
+  lastChecked: number;
 }
 
-// Add sync timestamp to interface
-interface SyncInfo {
-  lastSync: string;
-  userId: string;
-}
+// Biến để theo dõi trạng thái mạng
+let networkState: NetworkState = {
+  isConnected: true,
+  lastChecked: 0
+};
 
-// Add sync info storage key
-const SYNC_INFO_KEY = 'couple_funds_sync_info';
-
-// Modified service with sync handling
-const coupleFundService = {
-  // Get sync info
-  getSyncInfo: async (): Promise<SyncInfo | null> => {
+// ------ REQUEST INTERCEPTOR ------
+apiClient.interceptors.request.use(
+  async (config) => {
     try {
-      const syncInfo = await AsyncStorage.getItem(SYNC_INFO_KEY);
-      return syncInfo ? JSON.parse(syncInfo) : null;
+      // Thêm user ID vào header nếu có
+      const userId = await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.USER_ID);
+      if (userId) {
+        config.headers['user-id'] = userId;
+      }
     } catch (error) {
-      console.error('Error getting sync info:', error);
+      console.error('Lỗi khi lấy userId từ AsyncStorage:', error);
+    }
+    // Log thông tin request để debug
+    console.log(`${config.method?.toUpperCase()} request đến: ${config.baseURL}${config.url}`);
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// ------ RESPONSE INTERCEPTOR ------
+apiClient.interceptors.response.use(
+  (response) => {
+    // Cập nhật trạng thái mạng
+    networkState = {
+      isConnected: true,
+      lastChecked: Date.now()
+    };
+    console.log(`Nhận response từ ${response.config.url}, status: ${response.status}`);
+    return response;
+  },
+  async (error) => {
+    // Cập nhật trạng thái mạng nếu lỗi kết nối
+    if (axios.isAxiosError(error) && !error.response) {
+      networkState = {
+        isConnected: false,
+        lastChecked: Date.now()
+      };
+      
+      console.error('Lỗi kết nối! Không nhận được phản hồi từ server.');
+      console.log('Chuyển sang chế độ offline...');
+      
+      // Check if request was for fetching fund data and try to get from local storage
+      const url = error.config?.url;
+      if (url && url.includes('/couple-fund') && !url.includes('partners') && !url.includes('transactions')) {
+        const localData = await coupleFundService.getLocalData();
+        if (localData) {
+          console.log('Sử dụng dữ liệu local');
+          // Wrap the local data in a response-like object
+          return Promise.resolve({ 
+            data: { success: true, data: localData },
+            status: 200, 
+            statusText: 'OK',
+            headers: {},
+            config: error.config || {} 
+          });
+        }
+      }
+      
+      return Promise.reject(new Error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.'));
+    }
+    
+    // Xử lý các mã lỗi HTTP phổ biến
+    if (error.response) {
+      switch (error.response.status) {
+        case 404:
+          return Promise.reject(new Error('Không tìm thấy tài nguyên yêu cầu.'));
+        case 401:
+          return Promise.reject(new Error('Bạn cần đăng nhập để thực hiện thao tác này.'));
+        case 403:
+          return Promise.reject(new Error('Bạn không có quyền thực hiện thao tác này.'));
+        case 422:
+          return Promise.reject(new Error('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.'));
+        default:
+          return Promise.reject(new Error(error.response.data?.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.'));
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// ------ QUẢN LÝ QUỸ CHUNG API ------
+const coupleFundService = {
+  // Kiểm tra kết nối đến backend
+  checkConnection: async (): Promise<boolean> => {
+    // Nếu đã kiểm tra gần đây (trong 5 giây), trả về kết quả đã lưu
+    if (Date.now() - networkState.lastChecked < 5000) {
+      return networkState.isConnected;
+    }
+    
+    try {
+      const response = await apiClient.get('/', { timeout: 3000 });
+      networkState = {
+        isConnected: response.status === 200,
+        lastChecked: Date.now()
+      };
+      return networkState.isConnected;
+    } catch (error) {
+      networkState = {
+        isConnected: false,
+        lastChecked: Date.now()
+      };
+      console.error('Kiểm tra kết nối thất bại:', error);
+      return false;
+    }
+  },
+  
+  // Lấy thông tin quỹ với fallback sang dữ liệu local
+  getFund: async (): Promise<CoupleFund> => {
+    try {
+      console.log('Đang lấy dữ liệu quỹ chung...');
+      
+      // Kiểm tra kết nối trước
+      const isConnected = await coupleFundService.checkConnection();
+      if (!isConnected) {
+        console.log('Không có kết nối, sử dụng dữ liệu local');
+        const localData = await coupleFundService.getLocalData();
+        if (localData) {
+          return localData;
+        }
+        throw new Error('Không có kết nối mạng và không có dữ liệu local');
+      }
+      
+      // Kết nối OK, lấy dữ liệu từ server
+      const response = await apiClient.get('/couple-fund');
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Không thể lấy dữ liệu quỹ');
+      }
+      
+      const fundData = response.data.data;
+      
+      // Lưu dữ liệu vào local storage
+      await coupleFundService.saveLocalData(fundData);
+      
+      return fundData;
+    } catch (error: any) {
+      console.error('Lỗi khi lấy dữ liệu quỹ:', error.message);
+      
+      // Nếu lỗi kết nối, thử lấy từ local storage
+      if (axios.isAxiosError(error) && !error.response) {
+        console.log('API không phản hồi, kiểm tra local storage');
+        const localData = await coupleFundService.getLocalData();
+        if (localData) {
+          console.log('Tìm thấy dữ liệu trong local storage');
+          return localData;
+        }
+      }
+      
+      throw error;
+    }
+  },
+  
+  // Cập nhật thông tin quỹ với hỗ trợ offline
+  updateFund: async (id: string, fundData: Partial<CoupleFund>): Promise<CoupleFund> => {
+    try {
+      console.log('Đang cập nhật quỹ ID:', id);
+      
+      // Lưu thay đổi vào danh sách thay đổi chờ xử lý (để đồng bộ sau khi có mạng)
+      await coupleFundService.savePendingChange('update', {id, ...fundData});
+      
+      // Kiểm tra kết nối
+      const isConnected = await coupleFundService.checkConnection();
+      if (!isConnected) {
+        console.log('Không có kết nối, lưu thay đổi vào bộ nhớ cục bộ');
+        
+        // Cập nhật dữ liệu local
+        const localData = await coupleFundService.getLocalData();
+        if (localData && localData._id === id) {
+          const updatedData = {...localData, ...fundData, updatedAt: new Date().toISOString()};
+          await coupleFundService.saveLocalData(updatedData);
+          return updatedData;
+        }
+        throw new Error('Không có kết nối mạng và không tìm thấy dữ liệu local');
+      }
+      
+      // Kết nối OK, cập nhật trên server
+      const response = await apiClient.put('/couple-fund', { id, ...fundData });
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Không thể cập nhật thông tin quỹ');
+      }
+      
+      const updatedFund = response.data.data;
+      
+      // Cập nhật dữ liệu local
+      await coupleFundService.saveLocalData(updatedFund);
+      
+      // Xóa thay đổi khỏi danh sách chờ xử lý
+      await coupleFundService.removePendingChange('update', id);
+      
+      return updatedFund;
+    } catch (error: any) {
+      console.error('Lỗi khi cập nhật quỹ:', error.message);
+      throw error;
+    }
+  },
+  
+  // Thêm đối tác vào quỹ
+  addPartner: async (partner: { name: string; email: string }): Promise<CoupleFund> => {
+    try {
+      console.log('Đang thêm đối tác:', partner.name);
+      
+      // Kiểm tra kết nối
+      const isConnected = await coupleFundService.checkConnection();
+      if (!isConnected) {
+        throw new Error('Không thể thêm đối tác khi không có kết nối mạng');
+      }
+      
+      const response = await apiClient.post('/couple-fund/partners', partner);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Không thể thêm đối tác');
+      }
+      
+      const updatedFund = response.data.data;
+      
+      // Cập nhật dữ liệu local
+      await coupleFundService.saveLocalData(updatedFund);
+      
+      return updatedFund;
+    } catch (error: any) {
+      console.error('Lỗi khi thêm đối tác:', error.message);
+      throw error;
+    }
+  },
+  
+  // Xóa đối tác khỏi quỹ
+  removePartner: async (partnerId: string): Promise<CoupleFund> => {
+    try {
+      console.log('Đang xóa đối tác ID:', partnerId);
+      
+      // Kiểm tra kết nối
+      const isConnected = await coupleFundService.checkConnection();
+      if (!isConnected) {
+        throw new Error('Không thể xóa đối tác khi không có kết nối mạng');
+      }
+      
+      const response = await apiClient.delete(`/couple-fund/partners/${partnerId}`);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Không thể xóa đối tác');
+      }
+      
+      const updatedFund = response.data.data;
+      
+      // Cập nhật dữ liệu local
+      await coupleFundService.saveLocalData(updatedFund);
+      
+      return updatedFund;
+    } catch (error: any) {
+      console.error('Lỗi khi xóa đối tác:', error.message);
+      throw error;
+    }
+  },
+  
+  // Thêm giao dịch mới
+  addTransaction: async (transaction: Omit<Transaction, '_id' | 'date'>): Promise<CoupleFund> => {
+    try {
+      console.log('Đang thêm giao dịch mới:', transaction.type);
+      
+      // Lưu giao dịch vào danh sách chờ xử lý
+      await coupleFundService.savePendingChange('transaction', transaction);
+      
+      // Kiểm tra kết nối
+      const isConnected = await coupleFundService.checkConnection();
+      if (!isConnected) {
+        console.log('Không có kết nối, lưu giao dịch vào bộ nhớ cục bộ');
+        
+        // Cập nhật dữ liệu local tạm thời
+        const localData = await coupleFundService.getLocalData();
+        if (localData) {
+          const newTransaction = {
+            _id: `temp_${Date.now()}`,
+            ...transaction,
+            date: new Date().toISOString()
+          };
+          
+          // Tính toán số dư mới
+          let newBalance = localData.balance;
+          if (transaction.type === 'deposit') {
+            newBalance += transaction.amount;
+          } else if (transaction.type === 'withdraw' || transaction.type === 'expense') {
+            newBalance -= transaction.amount;
+          }
+          
+          const updatedFund = {
+            ...localData,
+            balance: newBalance,
+            transactions: [newTransaction, ...localData.transactions],
+            updatedAt: new Date().toISOString()
+          };
+          
+          await coupleFundService.saveLocalData(updatedFund);
+          return updatedFund;
+        }
+        throw new Error('Không có kết nối mạng và không tìm thấy dữ liệu local');
+      }
+      
+      // Kết nối OK, gửi giao dịch lên server
+      const response = await apiClient.post('/couple-fund/transactions', transaction);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Không thể thêm giao dịch');
+      }
+      
+      const updatedFund = response.data.data;
+      
+      // Cập nhật dữ liệu local
+      await coupleFundService.saveLocalData(updatedFund);
+      
+      // Xóa giao dịch khỏi danh sách chờ xử lý
+      await coupleFundService.removePendingChange('transaction', transaction);
+      
+      return updatedFund;
+    } catch (error: any) {
+      console.error('Lỗi khi thêm giao dịch:', error.message);
+      throw error;
+    }
+  },
+  
+  // Lấy danh sách giao dịch với bộ lọc
+  getTransactions: async (filters: TransactionFilter = {}): Promise<PaginatedTransactions> => {
+    try {
+      console.log('Đang lấy danh sách giao dịch với bộ lọc:', filters);
+      
+      // Kiểm tra kết nối
+      const isConnected = await coupleFundService.checkConnection();
+      if (!isConnected) {
+        console.log('Không có kết nối, lấy giao dịch từ dữ liệu local');
+        
+        const localData = await coupleFundService.getLocalData();
+        if (localData) {
+          // Lọc giao dịch theo bộ lọc
+          let filteredTransactions = [...localData.transactions];
+          
+          if (filters.type) {
+            filteredTransactions = filteredTransactions.filter(t => t.type === filters.type);
+          }
+          
+          if (filters.category) {
+            filteredTransactions = filteredTransactions.filter(t => t.category === filters.category);
+          }
+          
+          if (filters.startDate) {
+            filteredTransactions = filteredTransactions.filter(t => new Date(t.date) >= new Date(filters.startDate!));
+          }
+          
+          if (filters.endDate) {
+            filteredTransactions = filteredTransactions.filter(t => new Date(t.date) <= new Date(filters.endDate!));
+          }
+          
+          // Phân trang
+          const page = filters.page || 1;
+          const limit = filters.limit || 10;
+          const startIndex = (page - 1) * limit;
+          const endIndex = page * limit;
+          const pagedTransactions = filteredTransactions.slice(startIndex, endIndex);
+          
+          return {
+            transactions: pagedTransactions,
+            total: filteredTransactions.length,
+            page,
+            totalPages: Math.ceil(filteredTransactions.length / limit)
+          };
+        }
+        throw new Error('Không có kết nối mạng và không tìm thấy dữ liệu local');
+      }
+      
+      // Kết nối OK, lấy từ server
+      const response = await apiClient.get('/couple-fund/transactions', { params: filters });
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Không thể lấy danh sách giao dịch');
+      }
+      
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Lỗi khi lấy danh sách giao dịch:', error.message);
+      throw error;
+    }
+  },
+  
+  // Lưu dữ liệu quỹ vào bộ nhớ cục bộ cho sử dụng offline
+  saveLocalData: async (fund: CoupleFund): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(LOCAL_STORAGE_KEYS.FUND_DATA, JSON.stringify(fund));
+      await AsyncStorage.setItem(LOCAL_STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
+      console.log('Đã lưu dữ liệu quỹ vào bộ nhớ cục bộ');
+    } catch (error) {
+      console.error('Lỗi khi lưu dữ liệu quỹ vào bộ nhớ cục bộ:', error);
+    }
+  },
+  
+  // Lấy dữ liệu quỹ từ bộ nhớ cục bộ
+  getLocalData: async (): Promise<CoupleFund | null> => {
+    try {
+      const data = await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.FUND_DATA);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Lỗi khi lấy dữ liệu quỹ từ bộ nhớ cục bộ:', error);
       return null;
     }
   },
-
-  // Save sync info
-  saveSyncInfo: async (syncInfo: SyncInfo) => {
+  
+  // Lưu thay đổi vào danh sách chờ xử lý
+  savePendingChange: async (type: string, data: any): Promise<void> => {
     try {
-      await AsyncStorage.setItem(SYNC_INFO_KEY, JSON.stringify(syncInfo));
+      // Lấy danh sách thay đổi hiện tại
+      const pendingChangesStr = await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.PENDING_CHANGES) || '{}';
+      const pendingChanges = JSON.parse(pendingChangesStr);
+      
+      // Thêm thay đổi mới
+      if (!pendingChanges[type]) {
+        pendingChanges[type] = [];
+      }
+      
+      pendingChanges[type].push({
+        data,
+        timestamp: Date.now()
+      });
+      
+      // Lưu lại
+      await AsyncStorage.setItem(LOCAL_STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges));
     } catch (error) {
-      console.error('Error saving sync info:', error);
+      console.error('Lỗi khi lưu thay đổi chờ xử lý:', error);
     }
   },
-
-  // Get all funds with sync
-  getAllFunds: async (): Promise<CoupleFund[]> => {
+  
+  // Xóa thay đổi khỏi danh sách chờ xử lý
+  removePendingChange: async (type: string, data: any): Promise<void> => {
     try {
-      console.log('Fetching funds with sync...');
-      const userId = await AsyncStorage.getItem('userId') || 'default_user';
+      // Lấy danh sách thay đổi hiện tại
+      const pendingChangesStr = await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.PENDING_CHANGES) || '{}';
+      const pendingChanges = JSON.parse(pendingChangesStr);
       
-      // Get last sync info
-      const syncInfo = await coupleFundService.getSyncInfo();
-      console.log('Last sync info:', syncInfo);
-
-      const response = await apiClient.get<ApiResponse<CoupleFund[]>>('/couple-fund', {
-        headers: {
-          'user-id': userId,
-          'last-sync': syncInfo?.lastSync || ''
-        }
-      });
-
-      if (response.data.success) {
-        const funds = response.data.data;
-        console.log('Received', funds.length, 'funds from server');
-
-        // Save sync info
-        await coupleFundService.saveSyncInfo({
-          lastSync: response.data.timestamp || new Date().toISOString(),
-          userId
+      // Xóa thay đổi
+      if (pendingChanges[type]) {
+        const id = typeof data === 'string' ? data : (data._id || JSON.stringify(data));
+        pendingChanges[type] = pendingChanges[type].filter((change: any) => {
+          const changeId = typeof change.data === 'string' ? change.data : (change.data._id || JSON.stringify(change.data));
+          return changeId !== id;
         });
-
-        // Save to local storage
-        await AsyncStorage.setItem(SYNC_INFO_KEY, JSON.stringify({
-          lastSync: response.data.timestamp || new Date().toISOString(),
-          userId
-        }));
-        
-        return funds;
       }
       
-      throw new Error('Failed to fetch funds');
+      // Lưu lại
+      await AsyncStorage.setItem(LOCAL_STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges));
     } catch (error) {
-      console.error('Error fetching funds:', error);
-      throw error;
+      console.error('Lỗi khi xóa thay đổi chờ xử lý:', error);
     }
   },
-
-  // Update fund with sync
-  updateFund: async (id: string, fundData: Partial<CoupleFund>): Promise<CoupleFund> => {
+  
+  // Đồng bộ các thay đổi chờ xử lý khi có kết nối
+  syncPendingChanges: async (): Promise<boolean> => {
     try {
-      const userId = await AsyncStorage.getItem('userId') || 'default_user';
-      const response = await apiClient.put<ApiResponse<CoupleFund>>('/couple-fund', 
-        { id, ...fundData },
-        { headers: { 'user-id': userId } }
-      );
-
-      if (response.data.success) {
-        const updatedFund = response.data.data;
-        
-        // Update local storage
-        const storedData = await AsyncStorage.getItem(SYNC_INFO_KEY);
-        if (storedData) {
-          const syncInfo = JSON.parse(storedData);
-          const updatedSyncInfo = {
-            ...syncInfo,
-            lastSync: new Date().toISOString()
-          };
-          await AsyncStorage.setItem(SYNC_INFO_KEY, JSON.stringify(updatedSyncInfo));
+      // Kiểm tra kết nối
+      const isConnected = await coupleFundService.checkConnection();
+      if (!isConnected) {
+        return false;
+      }
+      
+      // Lấy danh sách thay đổi
+      const pendingChangesStr = await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.PENDING_CHANGES) || '{}';
+      const pendingChanges = JSON.parse(pendingChangesStr);
+      
+      let syncSuccess = true;
+      
+      // Xử lý các thay đổi theo thứ tự thời gian
+      if (pendingChanges.update && pendingChanges.update.length > 0) {
+        for (const change of pendingChanges.update) {
+          try {
+            const { id, ...data } = change.data;
+            await apiClient.put('/couple-fund', { id, ...data });
+            await coupleFundService.removePendingChange('update', id);
+          } catch (error) {
+            console.error('Lỗi khi đồng bộ cập nhật:', error);
+            syncSuccess = false;
+          }
         }
-
-        return updatedFund;
       }
       
-      throw new Error('Failed to update fund');
-    } catch (error) {
-      console.error('Error updating fund:', error);
-      throw error;
-    }
-  },
-
-  // Get fund data
-  getFund: async (): Promise<CoupleFund> => {
-    try {
-      console.log('Fetching couple fund data');
-      const response = await apiClient.get<ApiResponse<CoupleFund>>('/couple-fund');
-      
-      if (!response.data.success) {
-        throw new ApiError(
-          response.data.message || 'Failed to fetch couple fund',
-          API_ERROR_TYPES.SERVER_ERROR
-        );
+      if (pendingChanges.transaction && pendingChanges.transaction.length > 0) {
+        for (const change of pendingChanges.transaction) {
+          try {
+            await apiClient.post('/couple-fund/transactions', change.data);
+            await coupleFundService.removePendingChange('transaction', change.data);
+          } catch (error) {
+            console.error('Lỗi khi đồng bộ giao dịch:', error);
+            syncSuccess = false;
+          }
+        }
       }
       
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching couple fund:', error);
-      throw error;
-    }
-  },
-  
-  // Add partner
-  addPartner: async (partner: { name: string; email: string }): Promise<CoupleFund> => {
-    try {
-      console.log('Adding partner:', partner);
-      const response = await apiClient.post<ApiResponse<CoupleFund>>('/couple-fund/partners', partner);
-      
-      if (!response.data.success) {
-        throw new ApiError(response.data.message || 'Failed to add partner', API_ERROR_TYPES.SERVER_ERROR);
+      // Cập nhật dữ liệu từ server sau khi đã đồng bộ
+      if (syncSuccess) {
+        try {
+          const response = await apiClient.get('/couple-fund');
+          if (response.data.success) {
+            await coupleFundService.saveLocalData(response.data.data);
+          }
+        } catch (error) {
+          console.error('Lỗi khi cập nhật dữ liệu sau đồng bộ:', error);
+        }
       }
       
-      return response.data.data;
+      return syncSuccess;
     } catch (error) {
-      console.error('Error adding partner:', error);
-      throw error;
+      console.error('Lỗi khi đồng bộ thay đổi:', error);
+      return false;
     }
   },
   
-  // Remove partner
-  removePartner: async (partnerId: string): Promise<CoupleFund> => {
+  // Hàm debug để kiểm tra dữ liệu local storage
+  debugLocalStorage: async (): Promise<void> => {
     try {
-      console.log('Removing partner:', partnerId);
-      const response = await apiClient.delete<ApiResponse<CoupleFund>>(`/couple-fund/partners/${partnerId}`);
+      console.log('===== DEBUG LOCAL STORAGE =====');
       
-      if (!response.data.success) {
-        throw new ApiError(response.data.message || 'Failed to remove partner', API_ERROR_TYPES.SERVER_ERROR);
+      // Kiểm tra dữ liệu quỹ
+      const fundData = await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.FUND_DATA);
+      if (fundData) {
+        const parsedData = JSON.parse(fundData);
+        console.log('Dữ liệu quỹ:', {
+          _id: parsedData._id,
+          name: parsedData.name,
+          balance: parsedData.balance,
+          partnersCount: parsedData.partners?.length || 0,
+          transactionsCount: parsedData.transactions?.length || 0,
+          goal: parsedData.goal,
+          updatedAt: parsedData.updatedAt
+        });
+        
+        if (parsedData.transactions && parsedData.transactions.length > 0) {
+          console.log('Giao dịch gần đây:', parsedData.transactions.slice(0, 3));
+        }
+      } else {
+        console.log('Không tìm thấy dữ liệu quỹ trong local storage');
       }
       
-      return response.data.data;
+      // Kiểm tra thời gian đồng bộ
+      const lastSync = await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.LAST_SYNC);
+      console.log('Lần đồng bộ cuối:', lastSync || 'Chưa đồng bộ');
+      
+      // Kiểm tra các thay đổi đang chờ
+      const pendingChanges = await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.PENDING_CHANGES);
+      if (pendingChanges) {
+        console.log('Thay đổi đang chờ đồng bộ:', JSON.parse(pendingChanges));
+      } else {
+        console.log('Không có thay đổi đang chờ đồng bộ');
+      }
+      
+      // Kiểm tra userId
+      const userId = await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.USER_ID);
+      console.log('User ID:', userId || 'Không có');
+      
+      console.log('===== END DEBUG =====');
     } catch (error) {
-      console.error('Error removing partner:', error);
-      throw error;
+      console.error('Lỗi khi debug local storage:', error);
     }
   },
   
-  // Add transaction
-  addTransaction: async (transaction: Omit<Transaction, '_id' | 'date'>): Promise<CoupleFund> => {
+  // Xóa toàn bộ dữ liệu local storage
+  clearLocalData: async (): Promise<void> => {
     try {
-      console.log('Adding transaction:', transaction);
-      const response = await apiClient.post<ApiResponse<CoupleFund>>('/couple-fund/transactions', transaction);
-      
-      if (!response.data.success) {
-        throw new ApiError(response.data.message || 'Failed to add transaction', API_ERROR_TYPES.SERVER_ERROR);
-      }
-      
-      return response.data.data;
+      await AsyncStorage.removeItem(LOCAL_STORAGE_KEYS.FUND_DATA);
+      await AsyncStorage.removeItem(LOCAL_STORAGE_KEYS.LAST_SYNC);
+      await AsyncStorage.removeItem(LOCAL_STORAGE_KEYS.PENDING_CHANGES);
+      console.log('Đã xóa toàn bộ dữ liệu local');
     } catch (error) {
-      console.error('Error adding transaction:', error);
-      throw error;
+      console.error('Lỗi khi xóa dữ liệu local:', error);
     }
   },
-  
-  // Get transactions with filtering and pagination
-  getTransactions: async (filters: TransactionFilter = {}): Promise<PaginatedTransactions> => {
-    try {
-      console.log('Fetching transactions with filters:', filters);
-      const response = await apiClient.get<ApiResponse<PaginatedTransactions>>('/couple-fund/transactions', {
-        params: filters
-      });
-      
-      if (!response.data.success) {
-        throw new ApiError(response.data.message || 'Failed to fetch transactions', API_ERROR_TYPES.SERVER_ERROR);
-      }
-      
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      throw error;
-    }
-  }
 };
 
 export default coupleFundService; 

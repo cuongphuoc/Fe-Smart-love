@@ -15,6 +15,11 @@ const taskSchema = new mongoose.Schema({
   dueDate: {
     type: Date,
     required: [true, 'Due date is required']
+  },
+  deviceId: {
+    type: String,
+    index: true, // Add index for faster queries
+    default: null
   }
 }, {
   timestamps: true, // Adds createdAt and updatedAt fields

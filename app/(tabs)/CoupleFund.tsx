@@ -20,6 +20,8 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   TouchableWithoutFeedback,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
 import { FontAwesome5, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,8 +37,8 @@ import { useNavigation } from '@react-navigation/native';
 
 // Constants
 const API_BASE_URL = Platform.OS === 'android' 
-  ? 'http://192.168.1.2:5000/api/couple-fund'  // Use computer's IP address
-  : 'http://192.168.1.2:5000/api/couple-fund'; // Use computer's IP address for iOS too
+  ? 'http://192.168.1.7:5000/api/couple-fund'  // Use computer's IP address
+  : 'http://192.168.1.7:5000/api/couple-fund'; // Use computer's IP address for iOS too
 const STORAGE_KEY = 'couple_funds_data';
 const MAX_FUNDS = 20; // Allow up to 20 funds
 const { width } = Dimensions.get('window');
@@ -56,6 +58,30 @@ interface Fund {
   createdAt: string;
   modifiedAt?: string;
 }
+
+// Add type definitions at the top of the file
+type Styles = {
+  container: ViewStyle;
+  detailContainer: ViewStyle;
+  header: ViewStyle;
+  headerTitle: TextStyle;
+  main: ViewStyle;
+  scrollContainer: ViewStyle;
+  // ... existing style types ...
+  
+  // New style types
+  detailContent: ViewStyle;
+  scrollContentContainer: ViewStyle;
+  editInputsContainer: ViewStyle;
+  input: TextStyle;
+  amountInputsRow: ViewStyle;
+  amountInputWrapper: ViewStyle;
+  amountInputLabel: TextStyle;
+  amountInput: TextStyle;
+  editButtons: ViewStyle;
+  editButton: ViewStyle;
+  editButtonText: TextStyle;
+};
 
 // API Service
 const fundService = {
@@ -242,12 +268,13 @@ const fundService = {
     try {
       console.log('Attempting to delete fund:', id);
       const userId = await AsyncStorage.getItem('userId') || 'default_user';
+      console.log('Using userId for deletion:', userId);
       
       const response = await axios.delete(`${API_BASE_URL}/${id}`, {
         headers: {
           'user-id': userId
         },
-        timeout: 5000 // 5 second timeout
+        timeout: 8000 // Tăng timeout lên 8 giây
       });
 
       console.log('Delete response:', response.status, response.data);
@@ -258,9 +285,19 @@ const fundService = {
       }
       
       console.log('Delete failed:', response.data?.message);
+      Alert.alert('Delete failed', response.data?.message || 'Unknown error');
       return false;
     } catch (error: any) {
       console.error('Error deleting fund:', error.response?.data || error.message);
+      
+      // Kiểm tra lỗi cụ thể và hiển thị thông báo phù hợp
+      if (error.response?.data) {
+        const errorMessage = error.response.data.message || 'Failed to delete fund';
+        Alert.alert('Delete error', errorMessage);
+      } else {
+        Alert.alert('Delete error', 'Network error or server unavailable');
+      }
+      
       if (error.response?.status === 404) {
         console.log('Fund not found or already deleted');
         return true; // Consider it deleted if not found
@@ -873,20 +910,38 @@ const CoupleFundScreen: React.FC = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            setIsLoading(true);
+            
             try {
-              setIsLoading(true);
+              // Đảm bảo userId được lưu trong AsyncStorage trước
+              const userId = await AsyncStorage.getItem('userId');
+              if (!userId) {
+                // Nếu chưa có userId, lưu một cái mới
+                const newUserId = `user_${Date.now()}`;
+                await AsyncStorage.setItem('userId', newUserId);
+                console.log('Created and saved new userId:', newUserId);
+              } else {
+                console.log('Using existing userId:', userId);
+              }
               
               // Delete fund via API
-              await fundService.deleteFund(selectedFund.id);
+              const success = await fundService.deleteFund(selectedFund.id);
               
-              // Update local state
-              const updatedFunds = funds.filter(fund => fund.id !== selectedFund.id);
-              setFunds(updatedFunds);
-              await saveFundsData(updatedFunds);
-              setSelectedFund(null);
+              if (success) {
+                console.log('Successfully deleted fund from API');
+                // Update local state
+                const updatedFunds = funds.filter(fund => fund.id !== selectedFund.id);
+                setFunds(updatedFunds);
+                await saveFundsData(updatedFunds);
+                setSelectedFund(null);
+                // Hiển thị thông báo thành công
+                Alert.alert('Success', 'Fund deleted successfully');
+              } else {
+                console.log('API returned false for deletion');
+              }
             } catch (error) {
-              console.error('Error deleting fund:', error);
-              Alert.alert('Error', 'Failed to delete fund. Please try again.');
+              console.error('Error in handleDeleteFund:', error);
+              // Thông báo lỗi được xử lý trong fundService.deleteFund
             } finally {
               setIsLoading(false);
             }
@@ -1017,47 +1072,43 @@ const CoupleFundScreen: React.FC = () => {
   );
 
   const renderEditInputs = () => (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={100}
-      style={{ width: '100%' }}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View>
+    <View style={styles.editInputsContainer}>
+      <TextInput
+        style={[styles.input, { marginTop: 10 }]}
+        placeholder="Fund Title"
+        value={editingFund.title}
+        onChangeText={(text) => setEditingFund(prev => ({ ...prev, title: text }))}
+      />
+      <TextInput
+        style={[styles.input, { height: 80 }]}
+        placeholder="Description"
+        value={editingFund.description}
+        onChangeText={(text) => setEditingFund(prev => ({ ...prev, description: text }))}
+        multiline
+      />
+      <View style={styles.amountInputsRow}>
+        <View style={styles.amountInputWrapper}>
+          <Text style={styles.amountInputLabel}>Current Amount</Text>
           <TextInput
-            style={[styles.input, { marginTop: 10 }]}
-            placeholder="Fund Title"
-            value={editingFund.title}
-            onChangeText={(text) => setEditingFund(prev => ({ ...prev, title: text }))}
+            style={styles.amountInput}
+            value={editingFund.currentAmount}
+            onChangeText={(text) => handleAmountInput(text, 'current', setEditingFund)}
+            keyboardType="numeric"
+            returnKeyType="done"
           />
-          <TextInput
-            style={[styles.input, { height: 80 }]}
-            placeholder="Description"
-            value={editingFund.description}
-            onChangeText={(text) => setEditingFund(prev => ({ ...prev, description: text }))}
-            multiline
-          />
-          <View style={styles.amountInputContainer}>
-            <Text style={styles.amountInputLabel}>Current Amount</Text>
-            <TextInput
-              style={styles.amountInput}
-              value={editingFund.currentAmount}
-              onChangeText={(text) => handleAmountInput(text, 'current', setEditingFund)}
-              keyboardType="numeric"
-            />
-          </View>
-          <View style={styles.amountInputContainer}>
-            <Text style={styles.amountInputLabel}>Target Amount</Text>
-            <TextInput
-              style={styles.amountInput}
-              value={editingFund.targetAmount}
-              onChangeText={(text) => handleAmountInput(text, 'target', setEditingFund)}
-              keyboardType="numeric"
-            />
-          </View>
         </View>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+        <View style={styles.amountInputWrapper}>
+          <Text style={styles.amountInputLabel}>Target Amount</Text>
+          <TextInput
+            style={styles.amountInput}
+            value={editingFund.targetAmount}
+            onChangeText={(text) => handleAmountInput(text, 'target', setEditingFund)}
+            keyboardType="numeric"
+            returnKeyType="done"
+          />
+        </View>
+      </View>
+    </View>
   );
 
   const renderFundDetail = () => {
@@ -1065,198 +1116,207 @@ const CoupleFundScreen: React.FC = () => {
     
     const progress = calculateProgress(selectedFund.amount, selectedFund.targetAmount);
     const isCompleted = progress >= 100;
-    
-    // Sử dụng selectedImage nếu có (ảnh đang được chọn tạm thời) 
-    // hoặc ảnh của fund được chọn
     const displayImage = selectedImage || selectedFund.image;
     
     return (
-      <SafeAreaView style={styles.detailContainer}>
-        <View style={[styles.detailHeader, { paddingTop: insets.top || 12 }]}>
-          <TouchableOpacity
-            accessibilityLabel="Back"
-            onPress={() => setSelectedFund(null)}
-          >
-            <FontAwesome5 name="chevron-left" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.detailHeaderTitle}>
-            {selectedFund?.title || ''}
-          </Text>
-          <TouchableOpacity 
-            accessibilityLabel="Edit"
-            onPress={() => {
-              if (!isEditMode) {
-                setEditingFund({
-                  title: selectedFund?.title || '',
-                  description: selectedFund?.description || '',
-                  currentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '',
-                  targetAmount: selectedFund?.targetAmount || '',
-                });
-              }
-              setIsEditMode(!isEditMode);
-            }}
-          >
-            <FontAwesome5 name={isEditMode ? "check" : "edit"} size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 20}
+      >
+        <SafeAreaView style={styles.detailContainer}>
+          <View style={[styles.detailHeader, { paddingTop: insets.top || 12 }]}>
+            <TouchableOpacity
+              accessibilityLabel="Back"
+              onPress={() => setSelectedFund(null)}
+            >
+              <FontAwesome5 name="chevron-left" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.detailHeaderTitle}>
+              {selectedFund?.title || ''}
+            </Text>
+            <TouchableOpacity 
+              accessibilityLabel="Edit"
+              onPress={() => {
+                if (!isEditMode) {
+                  setEditingFund({
+                    title: selectedFund?.title || '',
+                    description: selectedFund?.description || '',
+                    currentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '',
+                    targetAmount: selectedFund?.targetAmount.replace(/[^0-9.]/g, '') || '',
+                  });
+                }
+                setIsEditMode(!isEditMode);
+              }}
+            >
+              <FontAwesome5 name={isEditMode ? "check" : "edit"} size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
 
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={64}
-        >
           <ScrollView 
-            style={styles.scrollContainer} 
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
+            style={styles.scrollContainer}
+            contentContainerStyle={[
+              styles.scrollContentContainer,
+              { flexGrow: 1, paddingBottom: isEditMode ? 120 : 24 }
+            ]}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <View style={styles.imageContainer}>
-              {displayImage ? (
-                <Image
-                  source={{ uri: displayImage }}
-                  style={styles.backgroundImage}
-                  accessibilityLabel={selectedFund?.altImage}
-                  // Thêm key để đảm bảo React re-render khi ảnh thay đổi
-                  key={displayImage}
-                />
-              ) : (
-                <View style={[styles.backgroundImage, styles.placeholderImage]}>
-                  <FontAwesome5 name="money-bill-wave" size={48} color="#e5e5e5" />
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.detailContent}>
+                {/* Image Section */}
+                <View style={[styles.imageContainer, isEditMode && { height: width * 0.3 }]}>
+                  {displayImage ? (
+                    <Image
+                      source={{ uri: displayImage }}
+                      style={styles.backgroundImage}
+                      accessibilityLabel={selectedFund?.altImage}
+                      key={displayImage}
+                    />
+                  ) : (
+                    <View style={[styles.backgroundImage, styles.placeholderImage]}>
+                      <FontAwesome5 name="money-bill-wave" size={48} color="#e5e5e5" />
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={styles.changePhotoButton}
+                    activeOpacity={0.8}
+                    accessibilityLabel="Change photo"
+                    onPress={handleImagePick}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.changePhotoGradient}
+                    >
+                      <View style={styles.changePhotoIconContainer}>
+                        <FontAwesome5 name="camera" size={14} color="#EE1D52" />
+                      </View>
+                      <Text style={styles.changePhotoText}>Change photo</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
                 </View>
-              )}
-              <TouchableOpacity
-                style={styles.changePhotoButton}
-                activeOpacity={0.8}
-                accessibilityLabel="Change photo"
-                onPress={handleImagePick}
-              >
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.changePhotoGradient}
-                >
-                  <View style={styles.changePhotoIconContainer}>
-                    <FontAwesome5 name="camera" size={14} color="#EE1D52" />
-                  </View>
-                  <Text style={styles.changePhotoText}>Change photo</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.detailCard}>
-              <View style={styles.fundInfo}>
-                <View style={styles.createdDateContainer}>
-                  <View style={styles.dateItem}>
-                    <FontAwesome5 name="calendar-plus" size={14} color="#6B7280" />
-                    <Text style={styles.createdDateText}>
-                      Created: {selectedFund?.createdAt?.split(' - ')[0]}
-                    </Text>
-                  </View>
-                  <View style={styles.dateItem}>
-                    <FontAwesome5 name="clock" size={14} color="#6B7280" />
-                    <Text style={styles.createdDateText}>
-                      Time: {selectedFund?.createdAt?.split(' - ')[1]}
-                    </Text>
-                  </View>
-                  {selectedFund?.modifiedAt && (
+                {/* Fund Details Section */}
+                <View style={[styles.detailCard, isEditMode && { paddingBottom: 32 }]}>
+                  {isEditMode ? (
                     <>
-                      <View style={styles.dateItem}>
-                        <FontAwesome5 name="calendar-alt" size={14} color="#6B7280" />
-                        <Text style={styles.createdDateText}>
-                          Modified: {selectedFund?.modifiedAt.split(' - ')[0]}
-                        </Text>
+                      {renderEditInputs()}
+                      <View style={styles.editButtons}>
+                        <TouchableOpacity 
+                          style={[styles.editButton, { backgroundColor: '#9CA3AF' }]}
+                          onPress={() => {
+                            setIsEditMode(false);
+                            setEditingFund({ title: '', description: '', currentAmount: '', targetAmount: '' });
+                            Keyboard.dismiss();
+                          }}
+                        >
+                          <Text style={styles.editButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.editButton}
+                          onPress={() => {
+                            handleEditFund();
+                            Keyboard.dismiss();
+                          }}
+                        >
+                          <Text style={styles.editButtonText}>Save</Text>
+                        </TouchableOpacity>
                       </View>
-                      <View style={styles.dateItem}>
-                        <FontAwesome5 name="clock" size={14} color="#6B7280" />
-                        <Text style={styles.createdDateText}>
-                          Time: {selectedFund?.modifiedAt.split(' - ')[1]}
-                        </Text>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.fundInfo}>
+                        <View style={styles.createdDateContainer}>
+                          <View style={styles.dateItem}>
+                            <FontAwesome5 name="calendar-plus" size={14} color="#6B7280" />
+                            <Text style={styles.createdDateText}>
+                              Created: {selectedFund?.createdAt?.split(' - ')[0]}
+                            </Text>
+                          </View>
+                          <View style={styles.dateItem}>
+                            <FontAwesome5 name="clock" size={14} color="#6B7280" />
+                            <Text style={styles.createdDateText}>
+                              Time: {selectedFund?.createdAt?.split(' - ')[1]}
+                            </Text>
+                          </View>
+                          {selectedFund?.modifiedAt && (
+                            <>
+                              <View style={styles.dateItem}>
+                                <FontAwesome5 name="calendar-alt" size={14} color="#6B7280" />
+                                <Text style={styles.createdDateText}>
+                                  Modified: {selectedFund?.modifiedAt.split(' - ')[0]}
+                                </Text>
+                              </View>
+                              <View style={styles.dateItem}>
+                                <FontAwesome5 name="clock" size={14} color="#6B7280" />
+                                <Text style={styles.createdDateText}>
+                                  Time: {selectedFund?.modifiedAt.split(' - ')[1]}
+                                </Text>
+                              </View>
+                            </>
+                          )}
+                        </View>
+                        <Text style={styles.fundBalanceLabel}>Fund Progress</Text>
+                        <FundProgressBar 
+                          progress={calculateProgress(selectedFund?.amount || '0', selectedFund?.targetAmount || '0')} 
+                        />
+                        {showCelebration && (
+                          <View style={styles.celebrationContainer}>
+                            <Text style={styles.celebrationText}>🎉 Congratulations! Fund completed! 🎉</Text>
+                            <TouchableOpacity 
+                              style={styles.celebrateAgainButton} 
+                              onPress={triggerCelebration}
+                            >
+                              <Text style={styles.celebrateAgainText}>Celebrate Again!</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        <View style={styles.amountContainer}>
+                          <View style={styles.amountBox}>
+                            <Text style={styles.amountLabel}>Current Amount</Text>
+                            <Text style={styles.fundBalanceAmount}>{selectedFund?.amount}</Text>
+                          </View>
+                          <View style={styles.amountBox}>
+                            <Text style={styles.amountLabel}>Target Amount</Text>
+                            <Text style={styles.fundBalanceAmount}>{selectedFund?.targetAmount}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.fundDescription}>{selectedFund?.description}</Text>
                       </View>
+
+                      <View style={styles.optionsSection}>
+                        <View style={styles.optionItem}>
+                          <FontAwesome5 name="hand-peace" size={18} color="#EE1D52" />
+                          <Text style={styles.optionText}>Reminder to{'\n'}contribute</Text>
+                        </View>
+                        <View style={styles.optionItem}>
+                          <FontAwesome5 name="qrcode" size={18} color="#EE1D52" />
+                          <Text style={styles.optionText}>QR fundraiser</Text>
+                        </View>
+                        <View style={styles.optionItem}>
+                          <FontAwesome5 name="money-bill-wave" size={18} color="#EE1D52" />
+                          <Text style={styles.optionText}>Payment,{'\n'}money transfer</Text>
+                        </View>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={handleDeleteFund}
+                      >
+                        <FontAwesome5 name="trash-alt" size={16} color="#FFFFFF" />
+                        <Text style={styles.deleteButtonText}>Delete Fund</Text>
+                      </TouchableOpacity>
                     </>
                   )}
                 </View>
-                <Text style={styles.fundBalanceLabel}>Fund Progress</Text>
-                <FundProgressBar 
-                  progress={calculateProgress(selectedFund?.amount || '0', selectedFund?.targetAmount || '0')} 
-                />
-                {showCelebration && (
-                  <View style={styles.celebrationContainer}>
-                    <Text style={styles.celebrationText}>🎉 Congratulations! Fund completed! 🎉</Text>
-                    <TouchableOpacity 
-                      style={styles.celebrateAgainButton} 
-                      onPress={triggerCelebration}
-                    >
-                      <Text style={styles.celebrateAgainText}>Celebrate Again!</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                <View style={styles.amountContainer}>
-                  <View style={styles.amountBox}>
-                    <Text style={styles.amountLabel}>Current Amount</Text>
-                    <Text style={styles.fundBalanceAmount}>{selectedFund?.amount}</Text>
-                  </View>
-                  <View style={styles.amountBox}>
-                    <Text style={styles.amountLabel}>Target Amount</Text>
-                    <Text style={styles.fundBalanceAmount}>{selectedFund?.targetAmount}</Text>
-                  </View>
-                </View>
-                {isEditMode ? (
-                  <>
-                    {renderEditInputs()}
-                    <View style={styles.editButtons}>
-                      <TouchableOpacity 
-                        style={[styles.editButton, { backgroundColor: '#9CA3AF' }]}
-                        onPress={() => {
-                          setIsEditMode(false);
-                          setEditingFund({ title: '', description: '', currentAmount: '', targetAmount: '' });
-                        }}
-                      >
-                        <Text style={styles.editButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={styles.editButton}
-                        onPress={handleEditFund}
-                      >
-                        <Text style={styles.editButtonText}>Save</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                ) : (
-                  <Text style={styles.fundDescription}>{selectedFund?.description}</Text>
-                )}
               </View>
-
-              <View style={styles.optionsSection}>
-                <View style={styles.optionItem}>
-                  <FontAwesome5 name="hand-peace" size={18} color="#EE1D52" />
-                  <Text style={styles.optionText}>Reminder to{'\n'}contribute</Text>
-                </View>
-                <View style={styles.optionItem}>
-                  <FontAwesome5 name="qrcode" size={18} color="#EE1D52" />
-                  <Text style={styles.optionText}>QR fundraiser</Text>
-                </View>
-                <View style={styles.optionItem}>
-                  <FontAwesome5 name="money-bill-wave" size={18} color="#EE1D52" />
-                  <Text style={styles.optionText}>Payment,{'\n'}money transfer</Text>
-                </View>
-              </View>
-
-              {!isEditMode && (
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={handleDeleteFund}
-                >
-                  <FontAwesome5 name="trash-alt" size={16} color="#FFFFFF" />
-                  <Text style={styles.deleteButtonText}>Delete Fund</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            </TouchableWithoutFeedback>
           </ScrollView>
-        </KeyboardAvoidingView>
-        
-        {/* Confetti overlay that will display on top */}
+        </SafeAreaView>
+
+        {/* Confetti overlay */}
         {showCelebration && (
           <View style={styles.confettiOverlay}>
             <ConfettiCannon
@@ -1271,7 +1331,7 @@ const CoupleFundScreen: React.FC = () => {
             />
           </View>
         )}
-      </SafeAreaView>
+      </KeyboardAvoidingView>
     );
   };
 
@@ -1433,20 +1493,4 @@ const CoupleFundScreen: React.FC = () => {
 
 export default CoupleFundScreen;
 
-// Extend existing styles
-Object.assign(styles, {
-  completedStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  completedText: {
-    color: '#4CAF50',
-    fontWeight: 'bold',
-    marginLeft: 4,
-    fontSize: 12,
-  },
-});
+// All styles have been moved to assets/styles/CoupleFundStyle.ts

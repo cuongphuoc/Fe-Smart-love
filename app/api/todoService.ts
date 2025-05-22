@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 // Your computer's IP address on your local network
 // IMPORTANT: Change this to your computer's actual IP address
-const YOUR_IP_ADDRESS = '192.168.1.2'; // Your computer's IP address
+// const YOUR_IP_ADDRESS = 'http://192.168.1.7:5000/api'; // Your computer's IP address
 
 // Determine if running in development mode
 const isDev = __DEV__;
@@ -25,10 +25,10 @@ const getBaseUrl = () => {
     }
   } else if (Platform.OS === 'android' || Platform.OS === 'ios') {
     // Use the same IP address for both Android and iOS
-    return `http://${YOUR_IP_ADDRESS}:5000/api`;
+    return `http://192.168.1.7:5000/api`;
   } else {
     // Default fallback
-    return `http://${YOUR_IP_ADDRESS}:5000/api`;
+    return `http://192.168.1.7:5000/api`;
   }
 };
 
@@ -89,6 +89,7 @@ export interface Task {
   title: string;
   completed: boolean;
   dueDate: string; // ISO format date string
+  deviceId?: string; // Device identifier for filtering tasks
 }
 
 // API response interfaces
@@ -101,12 +102,14 @@ interface ApiResponse<T> {
 // Todo service API functions
 export const todoService = {
   // Get all tasks
-  getAllTasks: async (): Promise<Task[]> => {
+  getAllTasks: async (deviceId?: string): Promise<Task[]> => {
     try {
       console.log('Fetching tasks from:', `${API_BASE_URL}/tasks`);
       console.log('Network request starting...');
       
-      const response = await apiClient.get<ApiResponse<Task[]>>('/tasks');
+      // Add deviceId as query parameter if provided
+      const params = deviceId ? { deviceId } : {};
+      const response = await apiClient.get<ApiResponse<Task[]>>('/tasks', { params });
       console.log('Response received:', response.data);
       
       if (!response.data.success) {
@@ -118,8 +121,14 @@ export const todoService = {
         dueDate: task.dueDate // Keep as string until needed as Date object
       }));
       
-      console.log('Processed tasks:', tasks);
-      return tasks;
+      // If deviceId is specified but API doesn't support filtering,
+      // filter tasks on the client side
+      const filteredTasks = deviceId 
+        ? tasks.filter(task => !task.deviceId || task.deviceId === deviceId)
+        : tasks;
+      
+      console.log('Processed tasks:', filteredTasks);
+      return filteredTasks;
     } catch (error) {
       console.error('Error fetching tasks:', error);
       if (axios.isAxiosError(error)) {

@@ -23,12 +23,14 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Device from 'expo-device';
 import { styles } from '../../assets/styles/ToDoListStyle';
 import { useTodoTasks, TasksByDate } from '../hooks/useTodoTasks';
 import { Task as ApiTask } from '../api/todoService';
 
 // STORAGE KEY
 const STORAGE_KEY = '@todo_list_data';
+const DEVICE_ID_KEY = '@device_id';
 
 // TYPES
 interface Task {
@@ -36,6 +38,7 @@ interface Task {
   title: string;
   completed: boolean;
   dueDate: Date;
+  deviceId?: string;
 }
 
 interface CalendarDayProps {
@@ -100,6 +103,9 @@ const editDistance = (s1: string, s2: string): number => {
 
 // MAIN COMPONENT
 const TodoListScreen = () => {
+  // Device ID state
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  
   // Use our custom hook to manage tasks with API integration
   const { 
     taskList,
@@ -111,7 +117,7 @@ const TodoListScreen = () => {
     deleteTask,
     deleteTasks,
     toggleTaskComplete
-  } = useTodoTasks();
+  } = useTodoTasks(deviceId);
   
   // Task Modal
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
@@ -163,6 +169,37 @@ const TodoListScreen = () => {
   });
   const [isDragging, setIsDragging] = useState(false);
   const [startTouch, setStartTouch] = useState({ x: 0, y: 0 });
+
+  // Generate or retrieve device ID
+  useEffect(() => {
+    const getOrCreateDeviceId = async () => {
+      try {
+        // Try to get existing device ID
+        let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
+        
+        // If no device ID exists, create one
+        if (!id) {
+          // Generate a unique ID based on device info and timestamp
+          const deviceName = Device.deviceName || 'unknown';
+          const modelName = Device.modelName || 'unknown';
+          const timestamp = new Date().getTime();
+          id = `${deviceName}-${modelName}-${timestamp}-${Math.random().toString(36).substring(2, 10)}`;
+          
+          // Store the new device ID
+          await AsyncStorage.setItem(DEVICE_ID_KEY, id);
+        }
+        
+        setDeviceId(id);
+      } catch (error) {
+        console.error('Error getting/creating device ID:', error);
+        // Generate a fallback ID if AsyncStorage fails
+        const fallbackId = `fallback-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+        setDeviceId(fallbackId);
+      }
+    };
+    
+    getOrCreateDeviceId();
+  }, []);
 
   // Effect: Show error alerts if API operations fail
   useEffect(() => {
@@ -219,7 +256,8 @@ const TodoListScreen = () => {
   const convertApiTaskToLocal = (apiTask: ApiTask): Task => {
     return {
       ...apiTask,
-      dueDate: new Date(apiTask.dueDate)
+      dueDate: new Date(apiTask.dueDate),
+      deviceId: apiTask.deviceId
     };
   };
 
@@ -227,7 +265,8 @@ const TodoListScreen = () => {
   const convertLocalTaskToApi = (localTask: Task): ApiTask => {
     return {
       ...localTask,
-      dueDate: localTask.dueDate.toISOString()
+      dueDate: localTask.dueDate.toISOString(),
+      deviceId: deviceId || undefined
     };
   };
 
@@ -383,18 +422,20 @@ const TodoListScreen = () => {
       // Update existing task
       updateTask(selectedTask.id, convertLocalTaskToApi({
         ...newTask,
-        id: selectedTask.id
+        id: selectedTask.id,
+        deviceId: selectedTask.deviceId || deviceId
       })).catch(error => {
         Alert.alert('Error', 'Failed to update task');
         console.error('Error updating task:', error);
       });
     } else {
-      // Add new task
-      // Prepare the task for API with an ISO date string
+      // Add new task with device ID
+      // Prepare the task for API with an ISO date string and device ID
       const apiTaskData = {
         title: newTask.title,
         completed: false,
-        dueDate: newTask.dueDate.toISOString()
+        dueDate: newTask.dueDate.toISOString(),
+        deviceId: deviceId || undefined
       };
       
       // Call the addTask API

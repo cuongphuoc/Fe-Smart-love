@@ -2,17 +2,19 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // Sử dụng biến môi trường nếu có, nếu không sử dụng URL trực tiếp
-    const mongoURI = process.env.MONGO_URI || 'mongodb+srv://sonmac9103:sonmac9103@cluster0.yor2o0q.mongodb.net/SLD?retryWrites=true&w=majority';
-    
-    const conn = await mongoose.connect(mongoURI, {
+    if (!process.env.MONGO_URI) {
+      throw new Error('MONGO_URI is not defined in environment variables');
+    }
+
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
+
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     console.log(`Database Name: ${conn.connection.name}`);
   } catch (error) {
-    console.error(`Error: ${error.message}`);
+    console.error(`Error connecting to MongoDB: ${error.message}`);
     process.exit(1);
   }
 };

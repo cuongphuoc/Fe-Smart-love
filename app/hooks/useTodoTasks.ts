@@ -14,6 +14,7 @@ export interface TasksByDate {
 // Extended Task interface with Date object
 export interface TaskWithDateObj extends Omit<Task, 'dueDate'> {
   dueDate: Date;
+  deviceId?: string;
 }
 
 // Interface for the hook's return value
@@ -34,7 +35,7 @@ function isDate(value: any): value is Date {
   return value instanceof Date && !isNaN(value.getTime());
 }
 
-export const useTodoTasks = (): UseTodoTasksReturn => {
+export const useTodoTasks = (deviceId?: string | null): UseTodoTasksReturn => {
   const [taskList, setTaskList] = useState<TasksByDate[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -54,7 +55,8 @@ export const useTodoTasks = (): UseTodoTasksReturn => {
       // Convert dueDate string to Date object before adding to the group
       grouped[dateOnly].push({
         ...task,
-        dueDate: new Date(task.dueDate)
+        dueDate: new Date(task.dueDate),
+        deviceId: task.deviceId
       } as TaskWithDateObj);
     });
     
@@ -77,7 +79,9 @@ export const useTodoTasks = (): UseTodoTasksReturn => {
       let tasks: Task[] = [];
       
       if (useCachedData) {
-        const cachedData = await AsyncStorage.getItem(TASKS_CACHE_KEY);
+        const cachedData = await AsyncStorage.getItem(
+          deviceId ? `${TASKS_CACHE_KEY}_${deviceId}` : TASKS_CACHE_KEY
+        );
         if (cachedData) {
           const parsedCache = JSON.parse(cachedData);
           setTaskList(parsedCache);
@@ -86,21 +90,24 @@ export const useTodoTasks = (): UseTodoTasksReturn => {
       }
       
       // Fetch from API regardless of cache to ensure we have latest data
-      tasks = await todoService.getAllTasks();
+      tasks = await todoService.getAllTasks(deviceId || undefined);
       
       // Group by date and update state
       const groupedTasks = groupTasksByDate(tasks);
       setTaskList(groupedTasks);
       
-      // Cache the latest data
-      await AsyncStorage.setItem(TASKS_CACHE_KEY, JSON.stringify(groupedTasks));
+      // Cache the latest data with device-specific key if needed
+      await AsyncStorage.setItem(
+        deviceId ? `${TASKS_CACHE_KEY}_${deviceId}` : TASKS_CACHE_KEY, 
+        JSON.stringify(groupedTasks)
+      );
     } catch (err) {
       setError(err instanceof Error ? err : new Error('An unknown error occurred'));
       console.error('Error fetching tasks:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [groupTasksByDate]);
+  }, [groupTasksByDate, deviceId]);
 
   // Function: Refresh tasks
   const refreshTasks = useCallback(async () => {

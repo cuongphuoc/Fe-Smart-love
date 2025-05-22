@@ -144,24 +144,8 @@ const updateCoupleFund = async (req, res) => {
     
     // Handle balance update through a transaction
     if (typeof balance !== 'undefined') {
-      const currentBalance = fund.balance || 0;
-      const newBalance = parseInt(balance);
-      
-      if (newBalance !== currentBalance) {
-        const difference = newBalance - currentBalance;
-        const transactionType = difference > 0 ? 'deposit' : 'withdraw';
-        
-        fund.transactions.push({
-          amount: Math.abs(difference),
-          type: transactionType,
-          category: transactionType === 'deposit' ? 'Income' : 'Expense',
-          description: `${transactionType === 'deposit' ? 'Added' : 'Withdrew'} ${Math.abs(difference)}đ`,
-          date: new Date(),
-          createdBy: 'User'
-        });
-        
-        fund.balance = newBalance;
-      }
+      // Directly set the new balance without calculating difference
+      fund.balance = parseInt(balance);
     }
     
     // Save to database
@@ -458,23 +442,22 @@ const getTransactions = async (req, res) => {
 const deleteFund = async (req, res) => {
   try {
     console.log('[DEBUG] Attempting to delete fund:', req.params.id);
-    const userId = req.headers['user-id'];
     const fundId = req.params.id;
     
-    if (!userId || !fundId) {
+    if (!fundId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID and Fund ID are required'
+        message: 'Fund ID is required'
       });
     }
 
     // Find the fund first to get image paths
-    const fund = await CoupleFund.findOne({ _id: fundId, userId });
+    const fund = await CoupleFund.findById(fundId);
     
     if (!fund) {
       return res.status(404).json({
         success: false,
-        message: 'Fund not found or you do not have permission to delete it'
+        message: 'Fund not found'
       });
     }
 

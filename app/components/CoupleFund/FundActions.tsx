@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { coupleFundService } from '../../api/coupleFundService';
+import coupleFundService from '../../api/coupleFundService';
 
 interface FundActionsProps {
   onSuccess?: () => void; // Callback khi thao tác thành công
@@ -9,6 +9,7 @@ interface FundActionsProps {
 const FundActions: React.FC<FundActionsProps> = ({ onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [logMessages, setLogMessages] = useState<string[]>([]);
+  const [fundId, setFundId] = useState<string>('');
 
   // Hàm ghi log
   const addLog = (message: string) => {
@@ -22,7 +23,10 @@ const FundActions: React.FC<FundActionsProps> = ({ onSuccess }) => {
     
     try {
       const fund = await coupleFundService.getFund();
-      addLog(`Lấy dữ liệu thành công: ${fund.name}, balance: ${fund.balance}`);
+      if (fund._id) {
+        setFundId(fund._id);
+      }
+      addLog(`Lấy dữ liệu thành công: ${fund.name}, balance: ${fund.balance}, id: ${fund._id || 'không có ID'}`);
       if (onSuccess) onSuccess();
     } catch (error: any) {
       addLog(`Lỗi khi lấy dữ liệu: ${error.message}`);
@@ -65,6 +69,13 @@ const FundActions: React.FC<FundActionsProps> = ({ onSuccess }) => {
     addLog("Đang cập nhật thông tin fund...");
     
     try {
+      if (!fundId) {
+        addLog("Lỗi: Chưa có fundId. Vui lòng lấy dữ liệu fund trước.");
+        Alert.alert('Lỗi', 'Vui lòng lấy dữ liệu fund trước khi cập nhật');
+        setLoading(false);
+        return;
+      }
+
       const updatedData = {
         name: 'Quỹ đã cập nhật ' + new Date().toLocaleDateString(),
         goal: {
@@ -75,7 +86,7 @@ const FundActions: React.FC<FundActionsProps> = ({ onSuccess }) => {
       };
       
       addLog(`Dữ liệu cập nhật: ${JSON.stringify(updatedData)}`);
-      const response = await coupleFundService.updateFund(updatedData);
+      const response = await coupleFundService.updateFund(fundId, updatedData);
       addLog(`Cập nhật thành công! Tên mới: ${response.name}`);
       Alert.alert('Thành công', 'Đã cập nhật thông tin quỹ!');
       if (onSuccess) onSuccess();
