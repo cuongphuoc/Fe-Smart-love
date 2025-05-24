@@ -276,6 +276,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
+    marginBottom:50
   },
   plusText: {
     fontSize: 32,
@@ -284,7 +285,7 @@ const styles = StyleSheet.create({
   },
   noDataText: {
     textAlign: 'center',
-    marginTop: 20,
+    marginTop:40,
     fontSize: 16,
     color: '#888',
   },
