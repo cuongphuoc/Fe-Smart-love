@@ -26,13 +26,18 @@ exports.getReminders = async (req, res) => {
 // Create a new reminder
 exports.createReminder = async (req, res) => {
   try {
-    const { fundId, title, description, type, amount, startDate, endDate, frequency, daysOfWeek, dayOfMonth } = req.body;
+    const { fundId, title, description, type, amount, startDate, endDate, frequency, daysOfWeek, dayOfMonth, time, notificationToken } = req.body;
     const userId = req.headers['user-id'];
 
     // Validate fund exists
     const fund = await CoupleFund.findOne({ _id: fundId, userId });
     if (!fund) {
       return res.status(404).json({ success: false, message: 'Fund not found' });
+    }
+
+    // Validate required time field
+    if (!time) {
+      return res.status(400).json({ success: false, message: 'Time is required in HH:mm format' });
     }
 
     // Create reminder
@@ -47,7 +52,9 @@ exports.createReminder = async (req, res) => {
       endDate,
       frequency,
       daysOfWeek,
-      dayOfMonth
+      dayOfMonth,
+      time,
+      notificationToken
     });
 
     await reminder.save();

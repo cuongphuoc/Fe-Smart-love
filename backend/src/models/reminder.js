@@ -88,6 +88,12 @@ reminderSchema.methods.shouldTrigger = function() {
     return false;
   }
 
+  // Check if time is properly set
+  if (!this.time) {
+    console.error('Reminder time is not set');
+    return false;
+  }
+
   // Check if it's too soon since last notification
   if (this.lastNotified) {
     const timeSinceLastNotification = now - this.lastNotified;

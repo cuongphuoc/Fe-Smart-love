@@ -45,8 +45,8 @@ import {
 
 // Constants
 const API_BASE_URL = Platform.OS === 'android' 
-  ? 'http://192.168.1.7:5000/api'  // Use computer's IP address
-  : 'http://192.168.1.7:5000/api'; // Use computer's IP address for iOS too
+  ? 'http://192.168.1.8:5000/api'  // Use computer's IP address
+  : 'http://192.168.1.8:5000/api'; // Use computer's IP address for iOS too
 const COUPLE_FUND_ENDPOINT = `${API_BASE_URL}/couple-fund`;
 const STORAGE_KEY = 'couple_funds_data';
 const MAX_FUNDS = 20; // Allow up to 20 funds
@@ -641,6 +641,8 @@ const CoupleFundScreen: React.FC = () => {
     description: '',
     currentAmount: '',
     targetAmount: '',
+    additionalAmount: '', // New field for additional amount
+    originalCurrentAmount: '', // Store original current amount for calculation
   });
 
   const [newFund, setNewFund] = useState({
@@ -927,11 +929,12 @@ const CoupleFundScreen: React.FC = () => {
     setFilteredFunds(searchResults);
   }, [funds]);
 
-  const handleAmountInput = (text: string, type: 'current' | 'target', setState: any) => {
+  const handleAmountInput = (text: string, type: 'current' | 'target' | 'additional', setState: any) => {
     if (!text.trim()) {
       setState((prev: any) => ({
         ...prev,
-        [type === 'current' ? 'currentAmount' : 'targetAmount']: ''
+        [type === 'current' ? 'currentAmount' : 
+         type === 'target' ? 'targetAmount' : 'additionalAmount']: ''
       }));
       return;
     }
@@ -939,7 +942,8 @@ const CoupleFundScreen: React.FC = () => {
     const formattedNumber = formatNumberWithDots(text);
     setState((prev: any) => ({
       ...prev,
-      [type === 'current' ? 'currentAmount' : 'targetAmount']: formattedNumber
+      [type === 'current' ? 'currentAmount' : 
+       type === 'target' ? 'targetAmount' : 'additionalAmount']: formattedNumber
     }));
   };
 
@@ -993,17 +997,22 @@ const CoupleFundScreen: React.FC = () => {
       setIsLoading(true);
       
       // Format the amounts for display
-      const formattedCurrentAmount = editingFund.currentAmount ? formatAmount(editingFund.currentAmount) : "0đ";
       const formattedTargetAmount = formatAmount(editingFund.targetAmount);
+      const formattedAdditionalAmount = editingFund.additionalAmount ? formatAmount(editingFund.additionalAmount) : "0đ";
       
       // Clean and parse amounts
-      const currentAmountClean = formattedCurrentAmount.replace(/[^\d]/g, '');
       const prevAmountClean = selectedFund!.amount.replace(/[^\d]/g, '');
-      const currentAmountValue = Number(currentAmountClean);
+      const additionalAmountClean = formattedAdditionalAmount.replace(/[^\d]/g, '');
+      const originalAmountClean = editingFund.originalCurrentAmount.replace(/[^\d]/g, '');
       const prevAmountValue = Number(prevAmountClean);
+      const additionalAmountValue = Number(additionalAmountClean);
+      const originalAmountValue = Number(originalAmountClean);
+      
+      // Calculate new total amount (original + additional)
+      const newTotalAmount = originalAmountValue + additionalAmountValue;
       
       // Check if amounts are valid numbers
-      if (isNaN(currentAmountValue) || isNaN(prevAmountValue)) {
+      if (isNaN(newTotalAmount) || isNaN(prevAmountValue)) {
         Alert.alert('Error', 'Invalid amount format. Please enter valid numbers.');
         setIsLoading(false);
         return;
@@ -1013,35 +1022,28 @@ const CoupleFundScreen: React.FC = () => {
       const fundData = {
         title: editingFund.title,
         description: editingFund.description || selectedFund!.description,
-        amount: formattedCurrentAmount,
+        amount: formatAmount(newTotalAmount.toString()),
         targetAmount: formattedTargetAmount,
         image: selectedImage || selectedFund!.image,
       };
       
       console.log('Attempting to update fund with data:', fundData);
+      console.log('Original amount:', originalAmountValue, 'Additional amount:', additionalAmountValue, 'New total:', newTotalAmount);
       
-      // Create a transaction record if amount has changed
-      // But do it separately from the fund update
+      // Create a transaction record if additional amount is provided
       let transactionResult = null;
-      if (currentAmountValue !== prevAmountValue) {
-        const difference = currentAmountValue - prevAmountValue;
-        const transactionType = difference > 0 ? 'deposit' : 'withdraw';
-        const transactionAmount = Math.abs(difference);
-        
-        console.log(`Amount change detected: ${prevAmountValue} -> ${currentAmountValue}, diff: ${difference}`);
-        
+      if (additionalAmountValue > 0) {
         try {
-          // Try to add a transaction record
+          // Add transaction for the additional amount
           transactionResult = await fundService.addTransaction(
             selectedFund!.id,
-            transactionAmount,
-            transactionType,
-            `Manual ${transactionType} adjustment`
+            additionalAmountValue,
+            'deposit',
+            'Manual deposit adjustment'
           );
           console.log('Transaction added successfully');
         } catch (transactionError) {
           console.error('Failed to add transaction, but will continue with fund update:', transactionError);
-          // We continue with the fund update even if transaction creation fails
         }
       }
       
@@ -1060,7 +1062,7 @@ const CoupleFundScreen: React.FC = () => {
         setSelectedFund(updatedFund);
         
         // Refresh transactions if we added a new one or if requested
-        if (transactionResult || currentAmountValue !== prevAmountValue) {
+        if (transactionResult || additionalAmountValue > 0) {
           try {
             const updatedTransactions = await fundService.getTransactions(selectedFund!.id);
             setTransactions(updatedTransactions);
@@ -1071,7 +1073,7 @@ const CoupleFundScreen: React.FC = () => {
         }
         
         // Check if fund was just completed for notification
-        const progress = calculateProgress(formattedCurrentAmount, formattedTargetAmount);
+        const progress = calculateProgress(selectedFund!.amount, selectedFund!.targetAmount);
         if (progress >= 100 && notificationsPermission && !notifiedFunds.includes(updatedFund.id)) {
           try {
             await sendFundCompletionNotification(updatedFund.title);
@@ -1104,7 +1106,7 @@ const CoupleFundScreen: React.FC = () => {
           
           // Update current amount last (most likely to cause issues)
           await fundService.updateFund(selectedFund!.id, {
-            amount: formattedCurrentAmount
+            amount: selectedFund!.amount
           });
           
           // If we got here, updates succeeded - fetch the updated fund
@@ -1176,6 +1178,8 @@ const CoupleFundScreen: React.FC = () => {
           description: selectedFund?.description || '',
           currentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '',
           targetAmount: selectedFund?.targetAmount.replace(/[^0-9.]/g, '') || '',
+          additionalAmount: '', // Initialize as empty string
+          originalCurrentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '', // Store original current amount
         });
         setIsEditMode(true);
       });
@@ -1949,6 +1953,7 @@ const CoupleFundScreen: React.FC = () => {
             onChangeText={(text) => handleAmountInput(text, 'current', setEditingFund)}
             keyboardType="numeric"
             returnKeyType="done"
+            editable={false} // Make current amount read-only
           />
         </View>
         <View style={styles.amountInputWrapper}>
@@ -1961,6 +1966,35 @@ const CoupleFundScreen: React.FC = () => {
             returnKeyType="done"
           />
         </View>
+      </View>
+      <View style={styles.amountInputWrapper}>
+        <Text style={styles.amountInputLabel}>Add Amount</Text>
+        <TextInput
+          style={styles.amountInput}
+          value={editingFund.additionalAmount}
+          onChangeText={(text) => {
+            console.log('Add Amount input changed:', text);
+            console.log('Original Current Amount:', editingFund.originalCurrentAmount);
+            
+            handleAmountInput(text, 'additional', setEditingFund);
+            
+            // Auto-update current amount when additional amount changes
+            const additionalValue = parseInt(text.replace(/[^\d]/g, '') || '0');
+            const originalValue = parseInt(editingFund.originalCurrentAmount.replace(/[^\d]/g, '') || '0');
+            const newCurrentAmount = (originalValue + additionalValue).toString();
+            
+            console.log('Calculation:', {
+              originalValue,
+              additionalValue, 
+              newCurrentAmount
+            });
+            
+            handleAmountInput(newCurrentAmount, 'current', setEditingFund);
+          }}
+          placeholder="Enter amount to add"
+          keyboardType="numeric"
+          returnKeyType="done"
+        />
       </View>
     </View>
   );
@@ -2052,7 +2086,14 @@ const CoupleFundScreen: React.FC = () => {
                           style={[styles.editButton, { backgroundColor: '#9CA3AF' }]}
                           onPress={() => {
                             setIsEditMode(false);
-                            setEditingFund({ title: '', description: '', currentAmount: '', targetAmount: '' });
+                            setEditingFund({ 
+                              title: '', 
+                              description: '', 
+                              currentAmount: '', 
+                              targetAmount: '',
+                              additionalAmount: '',
+                              originalCurrentAmount: '',
+                            });
                             Keyboard.dismiss();
                           }}
                         >
