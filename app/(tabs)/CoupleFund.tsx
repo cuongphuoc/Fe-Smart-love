@@ -1001,18 +1001,18 @@ const CoupleFundScreen: React.FC = () => {
       const formattedAdditionalAmount = editingFund.additionalAmount ? formatAmount(editingFund.additionalAmount) : "0đ";
       
       // Clean and parse amounts
-      const prevAmountClean = selectedFund!.amount.replace(/[^\d]/g, '');
+      const currentAmountClean = editingFund.currentAmount.replace(/[^\d]/g, '');
       const additionalAmountClean = formattedAdditionalAmount.replace(/[^\d]/g, '');
       const originalAmountClean = editingFund.originalCurrentAmount.replace(/[^\d]/g, '');
-      const prevAmountValue = Number(prevAmountClean);
+      const currentAmountValue = Number(currentAmountClean);
       const additionalAmountValue = Number(additionalAmountClean);
       const originalAmountValue = Number(originalAmountClean);
       
-      // Calculate new total amount (original + additional)
-      const newTotalAmount = originalAmountValue + additionalAmountValue;
+      // Calculate new total amount (current + additional)
+      const newTotalAmount = currentAmountValue + additionalAmountValue;
       
       // Check if amounts are valid numbers
-      if (isNaN(newTotalAmount) || isNaN(prevAmountValue)) {
+      if (isNaN(newTotalAmount) || isNaN(currentAmountValue)) {
         Alert.alert('Error', 'Invalid amount format. Please enter valid numbers.');
         setIsLoading(false);
         return;
@@ -1173,13 +1173,14 @@ const CoupleFundScreen: React.FC = () => {
     if (!isEditMode) {
       // Switching to edit mode requires authentication
       authenticateAction(() => {
+        const currentAmountValue = selectedFund?.amount.replace(/[^0-9.]/g, '') || '';
         setEditingFund({
           title: selectedFund?.title || '',
           description: selectedFund?.description || '',
-          currentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '',
+          currentAmount: currentAmountValue,
           targetAmount: selectedFund?.targetAmount.replace(/[^0-9.]/g, '') || '',
           additionalAmount: '', // Initialize as empty string
-          originalCurrentAmount: selectedFund?.amount.replace(/[^0-9.]/g, '') || '', // Store original current amount
+          originalCurrentAmount: currentAmountValue, // Store original current amount
         });
         setIsEditMode(true);
       });
@@ -1953,7 +1954,6 @@ const CoupleFundScreen: React.FC = () => {
             onChangeText={(text) => handleAmountInput(text, 'current', setEditingFund)}
             keyboardType="numeric"
             returnKeyType="done"
-            editable={false} // Make current amount read-only
           />
         </View>
         <View style={styles.amountInputWrapper}>
