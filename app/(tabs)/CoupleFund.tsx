@@ -45,8 +45,8 @@ import {
 
 // Constants
 const API_BASE_URL = Platform.OS === 'android' 
-  ? 'http://192.168.1.8:5000/api'  // Use computer's IP address
-  : 'http://192.168.1.8:5000/api'; // Use computer's IP address for iOS too
+  ? 'http://192.168.1.7:5000/api'  // Use computer's IP address
+  : 'http://192.168.1.7:5000/api'; // Use computer's IP address for iOS too
 const COUPLE_FUND_ENDPOINT = `${API_BASE_URL}/couple-fund`;
 const STORAGE_KEY = 'couple_funds_data';
 const MAX_FUNDS = 20; // Allow up to 20 funds
@@ -419,11 +419,17 @@ const formatDateTime = (date: Date): string => {
 };
 
 // Components
-const FundProgressBar = ({ progress }: { progress: number }) => {
+const FundProgressBar = ({ progress, currentAmount, targetAmount }: { progress: number, currentAmount: string, targetAmount: string }) => {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const percentAnim = useRef(new Animated.Value(0)).current;
   const [displayedPercent, setDisplayedPercent] = useState('0.00');
-  
+
+  // Calculate remaining amount
+  const currentValue = parseInt(currentAmount.replace(/[^\d]/g, ''), 10) || 0;
+  const targetValue = parseInt(targetAmount.replace(/[^\d]/g, ''), 10) || 0;
+  const remainingAmount = targetValue - currentValue;
+  const formattedRemainingAmount = formatAmount(remainingAmount.toString());
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(progressAnim, {
@@ -465,9 +471,31 @@ const FundProgressBar = ({ progress }: { progress: number }) => {
   return (
     <View style={styles.progressContainer}>
       <View style={styles.progressBar}>
-        <Animated.View style={[styles.progressFill, { width }]} />
+        <Animated.View 
+          style={[
+            styles.progressFill, 
+            { 
+              width,
+              backgroundColor: remainingAmount === 0 ? '#4CAF50' : '#EE1D52'
+            }
+          ]} 
+        />
       </View>
-      <Text style={styles.progressText}>{displayedPercent}%</Text>
+      <View style={styles.progressTextContainer}>
+        {remainingAmount === 0 ? (
+          <Text style={[styles.remainingText, { color: '#4CAF50', fontWeight: '600' }]}>Goal reached!!!</Text>
+        ) : (
+          <Text style={styles.remainingText}>{formattedRemainingAmount} left to complete</Text>
+        )}
+        <Text 
+          style={[
+            styles.progressText,
+            remainingAmount === 0 && { color: '#4CAF50' }
+          ]}
+        >
+          {displayedPercent}%
+        </Text>
+      </View>
     </View>
   );
 };
@@ -477,9 +505,10 @@ interface PinAuthModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  wasLastFundDeleted: boolean;
 }
 
-const PinAuthModal: React.FC<PinAuthModalProps> = ({ visible, onClose, onSuccess }) => {
+const PinAuthModal: React.FC<PinAuthModalProps> = ({ visible, onClose, onSuccess, wasLastFundDeleted }) => {
   const [pin, setPin] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState('');
   const [useBiometric, setUseBiometric] = useState(false);
@@ -487,12 +516,15 @@ const PinAuthModal: React.FC<PinAuthModalProps> = ({ visible, onClose, onSuccess
   // Check if biometric auth is available
   useEffect(() => {
     const checkBiometric = async () => {
-      const settings = await getSecuritySettings();
-      const isBiometricSupported = await checkBiometricSupport();
-      setUseBiometric(settings.useBiometric && isBiometricSupported);
-      
-      if (settings.useBiometric && isBiometricSupported) {
-        handleBiometricAuth();
+      // Only check biometric if the last fund wasn't deleted
+      if (!wasLastFundDeleted) {
+        const settings = await getSecuritySettings();
+        const isBiometricSupported = await checkBiometricSupport();
+        setUseBiometric(settings.useBiometric && isBiometricSupported);
+        
+        if (settings.useBiometric && isBiometricSupported) {
+          handleBiometricAuth();
+        }
       }
     };
     
@@ -500,7 +532,7 @@ const PinAuthModal: React.FC<PinAuthModalProps> = ({ visible, onClose, onSuccess
       checkBiometric();
       resetPin();
     }
-  }, [visible]);
+  }, [visible, wasLastFundDeleted]);
 
   const resetPin = () => {
     setPin('');
@@ -682,6 +714,9 @@ const CoupleFundScreen: React.FC = () => {
   const [pinConfirmation, setPinConfirmation] = useState('');
   const [pinError, setPinError] = useState('');
   const [isConfirmingPin, setIsConfirmingPin] = useState(false);
+
+  // Add new state to track if a fund was deleted
+  const [wasLastFundDeleted, setWasLastFundDeleted] = useState(false);
 
   // Add onRefresh handler
   const onRefresh = useCallback(async () => {
@@ -940,11 +975,24 @@ const CoupleFundScreen: React.FC = () => {
     }
 
     const formattedNumber = formatNumberWithDots(text);
-    setState((prev: any) => ({
-      ...prev,
-      [type === 'current' ? 'currentAmount' : 
-       type === 'target' ? 'targetAmount' : 'additionalAmount']: formattedNumber
-    }));
+    
+    if (type === 'additional') {
+      // When additional amount changes, update current amount
+      const additionalValue = parseInt(text.replace(/[^\d]/g, '') || '0', 10);
+      const originalValue = parseInt(editingFund.originalCurrentAmount.replace(/[^\d]/g, '') || '0', 10);
+      const newCurrentAmount = (originalValue + additionalValue).toString();
+      
+      setState((prev: any) => ({
+        ...prev,
+        additionalAmount: formattedNumber,
+        currentAmount: formatNumberWithDots(newCurrentAmount)
+      }));
+    } else {
+      setState((prev: any) => ({
+        ...prev,
+        [type === 'current' ? 'currentAmount' : 'targetAmount']: formattedNumber
+      }));
+    }
   };
 
   const handleCreateFund = async () => {
@@ -976,6 +1024,9 @@ const CoupleFundScreen: React.FC = () => {
       setFunds(updatedFunds);
       await saveFundsData(updatedFunds);
       
+      // Reset wasLastFundDeleted flag after creating new fund
+      setWasLastFundDeleted(false);
+      
       // Reset form
       setNewFund({
         title: '',
@@ -998,37 +1049,18 @@ const CoupleFundScreen: React.FC = () => {
       
       // Format the amounts for display
       const formattedTargetAmount = formatAmount(editingFund.targetAmount);
-      const formattedAdditionalAmount = editingFund.additionalAmount ? formatAmount(editingFund.additionalAmount) : "0đ";
-      
-      // Clean and parse amounts
-      const currentAmountClean = editingFund.currentAmount.replace(/[^\d]/g, '');
-      const additionalAmountClean = formattedAdditionalAmount.replace(/[^\d]/g, '');
-      const originalAmountClean = editingFund.originalCurrentAmount.replace(/[^\d]/g, '');
-      const currentAmountValue = Number(currentAmountClean);
-      const additionalAmountValue = Number(additionalAmountClean);
-      const originalAmountValue = Number(originalAmountClean);
-      
-      // Calculate new total amount (current + additional)
-      const newTotalAmount = currentAmountValue + additionalAmountValue;
-      
-      // Check if amounts are valid numbers
-      if (isNaN(newTotalAmount) || isNaN(currentAmountValue)) {
-        Alert.alert('Error', 'Invalid amount format. Please enter valid numbers.');
-        setIsLoading(false);
-        return;
-      }
+      const additionalAmountValue = parseInt(editingFund.additionalAmount.replace(/[^\d]/g, '') || '0', 10);
       
       // Prepare complete fund data for update
       const fundData = {
         title: editingFund.title,
         description: editingFund.description || selectedFund!.description,
-        amount: formatAmount(newTotalAmount.toString()),
+        amount: editingFund.currentAmount ? formatAmount(editingFund.currentAmount) : selectedFund!.amount,
         targetAmount: formattedTargetAmount,
         image: selectedImage || selectedFund!.image,
       };
       
       console.log('Attempting to update fund with data:', fundData);
-      console.log('Original amount:', originalAmountValue, 'Additional amount:', additionalAmountValue, 'New total:', newTotalAmount);
       
       // Create a transaction record if additional amount is provided
       let transactionResult = null;
@@ -1047,9 +1079,8 @@ const CoupleFundScreen: React.FC = () => {
         }
       }
       
-      // Perform the actual fund update with simplified approach
+      // Perform the actual fund update
       try {
-        // Try a direct update first - update all fields at once
         const updatedFund = await fundService.updateFund(selectedFund!.id, fundData);
         
         // Update local state with the updated fund
@@ -1061,89 +1092,22 @@ const CoupleFundScreen: React.FC = () => {
         await saveFundsData(updatedFunds);
         setSelectedFund(updatedFund);
         
-        // Refresh transactions if we added a new one or if requested
+        // Refresh transactions if we added a new one
         if (transactionResult || additionalAmountValue > 0) {
           try {
             const updatedTransactions = await fundService.getTransactions(selectedFund!.id);
             setTransactions(updatedTransactions);
           } catch (error) {
             console.error('Error fetching updated transactions:', error);
-            // Non-critical error, continue
-          }
-        }
-        
-        // Check if fund was just completed for notification
-        const progress = calculateProgress(selectedFund!.amount, selectedFund!.targetAmount);
-        if (progress >= 100 && notificationsPermission && !notifiedFunds.includes(updatedFund.id)) {
-          try {
-            await sendFundCompletionNotification(updatedFund.title);
-            const newNotifiedFunds = [...notifiedFunds, updatedFund.id];
-            setNotifiedFunds(newNotifiedFunds);
-            await AsyncStorage.setItem('notified_funds', JSON.stringify(newNotifiedFunds));
-          } catch (notificationError) {
-            console.error('Error sending notification:', notificationError);
-            // Non-critical error, continue
           }
         }
         
         Alert.alert('Success', 'Fund updated successfully');
-      } catch (updateError) {
-        console.error('Initial update failed, trying fallback method:', updateError);
-        
-        // Fallback: Try updating fields one by one
-        try {
-          // Start with non-amount fields
-          await fundService.updateFund(selectedFund!.id, {
-            title: editingFund.title,
-            description: editingFund.description || selectedFund!.description,
-            image: selectedImage || selectedFund!.image,
-          });
-          
-          // Update target amount separately
-          await fundService.updateFund(selectedFund!.id, {
-            targetAmount: formattedTargetAmount
-          });
-          
-          // Update current amount last (most likely to cause issues)
-          await fundService.updateFund(selectedFund!.id, {
-            amount: selectedFund!.amount
-          });
-          
-          // If we got here, updates succeeded - fetch the updated fund
-          const updatedFund = await fundService.getAllFunds().then(
-            funds => funds.find(f => f.id === selectedFund!.id)
-          );
-          
-          if (updatedFund) {
-            // Update local state
-            const updatedFunds = funds.map(fund => 
-              fund.id === selectedFund!.id ? updatedFund : fund
-            );
-            
-            setFunds(updatedFunds);
-            await saveFundsData(updatedFunds);
-            setSelectedFund(updatedFund);
-            
-            // Refresh transactions
-            try {
-              const updatedTransactions = await fundService.getTransactions(selectedFund!.id);
-              setTransactions(updatedTransactions);
-            } catch (error) {
-              console.error('Error fetching updated transactions in fallback:', error);
-            }
-            
-            Alert.alert('Success', 'Fund updated successfully');
-          } else {
-            throw new Error('Failed to get updated fund data');
-          }
-        } catch (fallbackError) {
-          console.error('Fallback update failed:', fallbackError);
-          Alert.alert('Update Error', 'Could not update the fund. Please try again later or with different values.');
-        }
+        setIsEditMode(false);
+      } catch (error) {
+        console.error('Error updating fund:', error);
+        Alert.alert('Error', 'Failed to update fund. Please try again.');
       }
-      
-      // Exit edit mode regardless of success/failure
-      setIsEditMode(false);
     } catch (error) {
       console.error('Unexpected error in performEdit:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
@@ -1173,14 +1137,13 @@ const CoupleFundScreen: React.FC = () => {
     if (!isEditMode) {
       // Switching to edit mode requires authentication
       authenticateAction(() => {
-        const currentAmountValue = selectedFund?.amount.replace(/[^0-9.]/g, '') || '';
         setEditingFund({
           title: selectedFund?.title || '',
           description: selectedFund?.description || '',
-          currentAmount: currentAmountValue,
-          targetAmount: selectedFund?.targetAmount.replace(/[^0-9.]/g, '') || '',
+          currentAmount: selectedFund?.amount || '',
+          targetAmount: selectedFund?.targetAmount || '',
           additionalAmount: '', // Initialize as empty string
-          originalCurrentAmount: currentAmountValue, // Store original current amount
+          originalCurrentAmount: selectedFund?.amount || '', // Store original amount
         });
         setIsEditMode(true);
       });
@@ -1207,18 +1170,6 @@ const CoupleFundScreen: React.FC = () => {
               setIsLoading(true);
               
               try {
-                // Ensure userId is saved in AsyncStorage
-                const userId = await AsyncStorage.getItem('userId');
-                if (!userId) {
-                  // If there's no userId, save a new one
-                  const newUserId = `user_${Date.now()}`;
-                  await AsyncStorage.setItem('userId', newUserId);
-                  console.log('Created and saved new userId:', newUserId);
-                } else {
-                  console.log('Using existing userId:', userId);
-                }
-                
-                // Delete fund via API
                 const success = await fundService.deleteFund(selectedFund.id);
                 
                 if (success) {
@@ -1228,14 +1179,13 @@ const CoupleFundScreen: React.FC = () => {
                   setFunds(updatedFunds);
                   await saveFundsData(updatedFunds);
                   setSelectedFund(null);
+                  // Mark that a fund was just deleted
+                  setWasLastFundDeleted(true);
                   // Show success message
                   Alert.alert('Success', 'Fund deleted successfully');
-                } else {
-                  console.log('API returned false for deletion');
                 }
               } catch (error) {
                 console.error('Error in handleDeleteFund:', error);
-                // Error handling in fundService.deleteFund
               } finally {
                 setIsLoading(false);
               }
@@ -1853,7 +1803,7 @@ const CoupleFundScreen: React.FC = () => {
             {isCompleted ? (
               <View style={styles.completedStatus}>
                 <FontAwesome5 name="check-circle" size={16} color="#4CAF50" />
-                <Text style={styles.completedText}>DONE</Text>
+                <Text style={styles.completedText}>Completed</Text>
               </View>
             ) : (
               <>
@@ -1957,7 +1907,7 @@ const CoupleFundScreen: React.FC = () => {
           />
         </View>
         <View style={styles.amountInputWrapper}>
-          <Text style={styles.amountInputLabel}>Target Amount</Text>
+          <Text style={styles.amountInputLabel}>Goal Amount</Text>
           <TextInput
             style={styles.amountInput}
             value={editingFund.targetAmount}
@@ -2146,6 +2096,8 @@ const CoupleFundScreen: React.FC = () => {
                         <Text style={styles.fundBalanceLabel}>Fund Progress</Text>
                         <FundProgressBar 
                           progress={calculateProgress(selectedFund?.amount || '0', selectedFund?.targetAmount || '0')} 
+                          currentAmount={selectedFund?.amount || '0'}
+                          targetAmount={selectedFund?.targetAmount || '0'}
                         />
                         {showCelebration && (
                           <View style={styles.celebrationContainer}>
@@ -2166,12 +2118,12 @@ const CoupleFundScreen: React.FC = () => {
                           </View>
                         )}
                         <View style={styles.amountContainer}>
-                          <View style={styles.amountBox}>
+                          <View style={styles.amountBoxVertical}>
                             <Text style={styles.amountLabel}>Current Amount</Text>
                             <Text style={styles.fundBalanceAmount}>{selectedFund?.amount}</Text>
                           </View>
-                          <View style={styles.amountBox}>
-                            <Text style={styles.amountLabel}>Target Amount</Text>
+                          <View style={styles.amountBoxVertical}>
+                            <Text style={styles.amountLabel}>Goal Amount</Text>
                             <Text style={styles.fundBalanceAmount}>{selectedFund?.targetAmount}</Text>
                           </View>
                         </View>
@@ -2218,6 +2170,7 @@ const CoupleFundScreen: React.FC = () => {
             setPendingAction(null);
           }}
           onSuccess={handleAuthSuccess}
+          wasLastFundDeleted={wasLastFundDeleted}
         />
 
         {/* Confetti overlay */}
@@ -2308,47 +2261,48 @@ const CoupleFundScreen: React.FC = () => {
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ width: '100%', justifyContent: 'flex-end' }}
-          >
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Create New Fund</Text>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                  <FontAwesome name="times" size={24} color="#666666" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Fund Title"
-                  value={newFund.title}
-                  onChangeText={(text) => setNewFund(prev => ({ ...prev, title: text }))}
-                />
-                <TextInput
-                  style={[styles.modalInput, { height: 80 }]}
-                  placeholder="Description"
-                  value={newFund.description}
-                  onChangeText={(text) => setNewFund(prev => ({ ...prev, description: text }))}
-                  multiline
-                />
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Current Amount"
-                  value={newFund.currentAmount}
-                  onChangeText={(text) => handleAmountInput(text, 'current', setNewFund)}
-                  keyboardType="numeric"
-                />
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Target Amount"
-                  value={newFund.targetAmount}
-                  onChangeText={(text) => handleAmountInput(text, 'target', setNewFund)}
-                  keyboardType="numeric"
-                />
-                
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={{ width: '100%' }}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+            >
+              <View style={[styles.modalContent, { maxHeight: '100%' }]}> 
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Create New Fund</Text>
+                  <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                    <FontAwesome name="times" size={24} color="#666666" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.modalInputContainer}>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Fund Title"
+                    value={newFund.title}
+                    onChangeText={(text) => setNewFund(prev => ({ ...prev, title: text }))}
+                  />
+                  <TextInput
+                    style={[styles.modalInput, { height: 80 }]}
+                    placeholder="Description"
+                    value={newFund.description}
+                    onChangeText={(text) => setNewFund(prev => ({ ...prev, description: text }))}
+                    multiline
+                  />
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Current Amount"
+                    value={newFund.currentAmount}
+                    onChangeText={(text) => handleAmountInput(text, 'current', setNewFund)}
+                    keyboardType="numeric"
+                  />
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Goal Amount"
+                    value={newFund.targetAmount}
+                    onChangeText={(text) => handleAmountInput(text, 'target', setNewFund)}
+                    keyboardType="numeric"
+                  />
+                </View>
                 <View style={styles.modalButtons}>
                   <TouchableOpacity 
                     style={[styles.modalButton, { backgroundColor: '#9CA3AF' }]}
@@ -2371,9 +2325,9 @@ const CoupleFundScreen: React.FC = () => {
                     <Text style={styles.modalButtonText}>Create</Text>
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
-            </View>
-          </KeyboardAvoidingView>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
         </View>
       </TouchableWithoutFeedback>
     </Modal>
@@ -2394,6 +2348,15 @@ const CoupleFundScreen: React.FC = () => {
       {renderTransactionHistoryModal()}
       {renderReminderSettingsModal()}
       {renderSecuritySettingsModal()}
+      <PinAuthModal 
+        visible={showAuthModal}
+        onClose={() => {
+          setShowAuthModal(false);
+          setPendingAction(null);
+        }}
+        onSuccess={handleAuthSuccess}
+        wasLastFundDeleted={wasLastFundDeleted}
+      />
     </>
   );
 };

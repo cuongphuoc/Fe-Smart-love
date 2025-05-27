@@ -145,7 +145,9 @@ interface Styles {
   progressContainer: ViewStyle;
   progressBar: ViewStyle;
   progressFill: ViewStyle;
+  progressTextContainer: ViewStyle;
   progressText: TextStyle;
+  remainingText: TextStyle;
   amountContainer: ViewStyle;
   amountBox: ViewStyle;
   amountLabel: TextStyle;
@@ -175,6 +177,7 @@ interface Styles {
   modalContent: ViewStyle;
   modalHeader: ViewStyle;
   modalTitle: TextStyle;
+  modalInputContainer: ViewStyle;
   modalInput: TextStyle;
   modalButtons: ViewStyle;
   modalButton: ViewStyle;
@@ -493,9 +496,8 @@ export const styles = StyleSheet.create<any>({
   },
   fundBalanceAmount: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-    textAlign: 'center',
+    fontWeight: '600',
+    color: COLORS.textDark,
   },
   fundDescription: {
     fontSize: 12,
@@ -609,15 +611,16 @@ export const styles = StyleSheet.create<any>({
   },
   modalContent: {
     ...commonStyles.modalBase,
-    maxHeight: '90%',
+    maxHeight: '85%',
     ...commonStyles.modalShadow,
+    paddingBottom: 24,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 15,
+    marginBottom: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
@@ -626,18 +629,22 @@ export const styles = StyleSheet.create<any>({
     fontWeight: '600',
     color: COLORS.textDark,
   },
+  modalInputContainer: {
+    paddingHorizontal: 4,
+    marginBottom: 16,
+  },
   modalInput: {
     ...commonStyles.input,
     height: 48,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     backgroundColor: '#F9FAFB',
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginTop: 20,
+    paddingHorizontal: 4,
   },
   modalButton: {
     flex: 1,
@@ -728,52 +735,55 @@ export const styles = StyleSheet.create<any>({
   
   // Progress bar styles
   progressContainer: {
-    marginTop: 16,
-    marginBottom: 12,
+    marginTop: 8,
+    marginBottom: 16,
   },
   progressBar: {
-    width: '100%',
     height: 8,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: '#E5E7EB',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#EE1D52',
     borderRadius: 4,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 3,
-    elevation: 3,
+  },
+  progressTextContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
   },
   progressText: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.primary,
-    textAlign: 'right',
-    marginTop: 8,
+  },
+  remainingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.primary,
   },
   
   // Amount display styles
   amountContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     marginVertical: 16,
+    gap: 8,
   },
-  amountBox: {
-    flex: 1,
+  amountBoxVertical: {
+    width: '100%',
     padding: 12,
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
-    marginHorizontal: 4,
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   amountLabel: {
-    fontSize: 14,
-    color: COLORS.secondary,
+    fontSize: 13,
+    color: COLORS.textMedium,
     marginBottom: 4,
-    textAlign: 'center',
   },
   
   // Loading styles

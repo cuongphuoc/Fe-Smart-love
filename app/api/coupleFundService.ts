@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 // Backend API URL - Thay đổi IP này khi cần thiết
-const BACKEND_IP = '192.168.1.8'; // Đảm bảo IP này trùng với IP của máy tính
+const BACKEND_IP = '192.168.1.7'; // Đảm bảo IP này trùng với IP của máy tính
 const API_URL = `http://${BACKEND_IP}:5000/api`;
 
 // Key lưu trữ dữ liệu local
