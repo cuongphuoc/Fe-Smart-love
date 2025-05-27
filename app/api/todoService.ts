@@ -25,10 +25,10 @@ const getBaseUrl = () => {
     }
   } else if (Platform.OS === 'android' || Platform.OS === 'ios') {
     // Use the same IP address for both Android and iOS
-    return `http://192.168.1.7:5000/api`;
+    return `http://172.21.1.174:5000/api`;
   } else {
     // Default fallback
-    return `http://192.168.1.7:5000/api`;
+    return `http://172.21.1.174:5000/api`;
   }
 };
 
